@@ -117,3 +117,56 @@ pub fn run() {
         .run(generate_context())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_specta_export() {
+        let builder = tauri_specta::Builder::<tauri::Wry>::new()
+            .commands(tauri_specta::collect_commands![
+                greet,
+                get_config,
+                save_config,
+                login,
+                get_user_profile,
+                search,
+                get_comic,
+                get_favorite,
+                get_downloaded_comics,
+                export_cbz,
+                export_pdf,
+                export_cbz_chapters,
+                export_pdf_chapters,
+                update_downloaded_comics,
+                get_logs_dir_size,
+                show_path_in_file_manager,
+                create_download_task,
+                pause_download_task,
+                resume_download_task,
+                delete_download_task,
+                get_synced_comic,
+                get_synced_comic_in_favorite,
+                get_synced_comic_in_search,
+                open_log_file,
+            ])
+            .events(tauri_specta::collect_events![
+                DownloadEvent,
+                ExportCbzEvent,
+                ExportPdfEvent,
+                UpdateDownloadedComicsEvent,
+                LogEvent,
+            ]);
+
+        builder
+            .export(
+                specta_typescript::Typescript::default()
+                    .bigint(specta_typescript::BigIntExportBehavior::Number)
+                    .header("// @ts-nocheck"),
+                "../src/bindings.ts",
+            )
+            .expect("Failed to export typescript bindings");
+    }
+}
+

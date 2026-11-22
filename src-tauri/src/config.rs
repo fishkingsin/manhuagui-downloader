@@ -116,6 +116,16 @@ pub enum ProxyMode {
     Custom,
 }
 
+impl From<ProxyMode> for source_api::ProxyMode {
+    fn from(m: ProxyMode) -> Self {
+        match m {
+            ProxyMode::System => source_api::ProxyMode::System,
+            ProxyMode::NoProxy => source_api::ProxyMode::NoProxy,
+            ProxyMode::Custom => source_api::ProxyMode::Custom,
+        }
+    }
+}
+
 /// 导出跳过模式
 #[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Type)]
 pub enum ExportSkipMode {
@@ -127,3 +137,39 @@ pub enum ExportSkipMode {
     /// 跳过曾导出过的章节(即使本地文件已删除)
     SkipExported,
 }
+
+impl From<ExportSkipMode> for source_api::ExportSkipMode {
+    fn from(m: ExportSkipMode) -> Self {
+        match m {
+            ExportSkipMode::None => source_api::ExportSkipMode::None,
+            ExportSkipMode::SkipExisting => source_api::ExportSkipMode::SkipExisting,
+            ExportSkipMode::SkipExported => source_api::ExportSkipMode::SkipExported,
+        }
+    }
+}
+
+impl From<&Config> for source_api::CoreConfig {
+    fn from(c: &Config) -> Self {
+        source_api::CoreConfig {
+            cookie: c.cookie.clone(),
+            download_dir: c.download_dir.clone(),
+            export_dir: c.export_dir.clone(),
+            chapter_concurrency: c.chapter_concurrency,
+            chapter_download_interval_sec: c.chapter_download_interval_sec,
+            img_concurrency: c.img_concurrency,
+            img_download_interval_sec: c.img_download_interval_sec,
+            update_get_comic_interval_sec: c.update_get_comic_interval_sec,
+            api_timeout_sec: 3,
+            img_timeout_sec: 3,
+            proxy_mode: c.proxy_mode.into(),
+            proxy_host: c.proxy_host.clone(),
+            proxy_port: c.proxy_port,
+            comic_dir_fmt: c.comic_dir_fmt.clone(),
+            chapter_dir_fmt: c.chapter_dir_fmt.clone(),
+            create_pdf_concurrency: c.create_pdf_concurrency,
+            enable_merge_pdf: c.enable_merge_pdf,
+            export_skip_mode: c.export_skip_mode.into(),
+        }
+    }
+}
+

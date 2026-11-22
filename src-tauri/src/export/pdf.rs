@@ -158,7 +158,7 @@ fn pdf_internal(
 
     let extension = ExportFormat::Pdf.extension();
     let comic_export_dir = comic
-        .get_comic_export_dir(app)
+        .get_comic_export_dir(&app.get_core_config())
         .wrap_err("获取导出目录失败")?;
 
     // 章节和它们对应的pdf路径(用于合并)

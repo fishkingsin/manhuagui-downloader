@@ -42,7 +42,7 @@ impl DownloadTask {
         fields(comic_id = comic.id, comic_title = comic.title, chapter_id = chapter_id)
     )]
     pub fn new(app: AppHandle, mut comic: Comic, chapter_id: i64) -> eyre::Result<Arc<Self>> {
-        comic.ensure_download_dir_fields(&app)?;
+        comic.ensure_download_dir_fields(&app.get_core_config())?;
 
         let chapter_info = comic
             .groups

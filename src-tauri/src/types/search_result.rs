@@ -2,24 +2,21 @@ use std::{collections::HashMap, path::PathBuf};
 
 use eyre::{OptionExt, WrapErr};
 use scraper::{ElementRef, Html, Selector};
-use serde::{Deserialize, Serialize};
-use specta::Type;
 use tauri::AppHandle;
 use tracing::instrument;
 
 use crate::{extensions::ToEyre, utils};
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct SearchResult {
-    pub comics: Vec<ComicInSearch>,
-    pub current: i64,
-    pub total: i64,
+#[allow(unused_imports)]
+pub use source_api::{ComicInSearch, SearchResult, SearchResultComic};
+
+pub trait SearchResultExt {
+    fn from_html(app: &AppHandle, html: &str) -> eyre::Result<SearchResult>;
 }
 
-impl SearchResult {
+impl SearchResultExt for SearchResult {
     #[instrument(level = "error", skip_all)]
-    pub fn from_html(app: &AppHandle, html: &str) -> eyre::Result<SearchResult> {
+    fn from_html(app: &AppHandle, html: &str) -> eyre::Result<SearchResult> {
         let id_to_dir_map = utils::create_id_to_dir_map(app)?;
 
         let document = Html::parse_document(html);
@@ -27,7 +24,7 @@ impl SearchResult {
 
         let mut comics = Vec::new();
         for book_li in document.select(&book_result_selector) {
-            let comic = ComicInSearch::from_li(&book_li, &id_to_dir_map)?;
+            let comic = comic_in_search_from_li(&book_li, &id_to_dir_map)?;
             comics.push(comic);
         }
 
@@ -62,128 +59,91 @@ impl SearchResult {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct ComicInSearch {
-    /// 漫画id
-    pub id: i64,
-    /// 漫画标题
-    pub title: String,
-    /// 漫画副标题
-    pub subtitle: Option<String>,
-    /// 封面链接
-    pub cover: String,
-    /// 漫画状态(连载中/已完结)
-    pub status: String,
-    /// 上次更新时间
-    pub update_time: String,
-    /// 出版年份
-    pub year: i64,
-    /// 地区
-    pub region: String,
-    /// 类型
-    pub genres: Vec<String>,
-    /// 作者
-    pub authors: Vec<String>,
-    /// 漫画别名
-    pub aliases: Vec<String>,
-    /// 简介
-    pub intro: String,
-    /// 是否已下载
-    pub is_downloaded: bool,
-    /// 漫画的下载目录
-    pub comic_download_dir: PathBuf,
+#[allow(dead_code)]
+pub fn parse_search_result_from_html(app: &AppHandle, html: &str) -> eyre::Result<SearchResult> {
+    SearchResult::from_html(app, html)
 }
 
-impl ComicInSearch {
-    #[instrument(level = "error", skip_all)]
-    pub fn from_li(
-        li: &ElementRef,
-        id_to_dir_map: &HashMap<i64, PathBuf>,
-    ) -> eyre::Result<ComicInSearch> {
-        let book_detail_div = li
-            .select(&Selector::parse(".book-detail").to_eyre()?)
-            .next()
-            .ok_or_eyre("没有找到书籍详情的<div>")?;
+#[instrument(level = "error", skip_all)]
+fn comic_in_search_from_li(
+    li: &ElementRef,
+    id_to_dir_map: &HashMap<i64, PathBuf>,
+) -> eyre::Result<ComicInSearch> {
+    let book_detail_div = li
+        .select(&Selector::parse(".book-detail").to_eyre()?)
+        .next()
+        .ok_or_eyre("没有找到书籍详情的<div>")?;
 
-        let dt = book_detail_div
-            .select(&Selector::parse("dt").to_eyre()?)
-            .next()
-            .ok_or_eyre("没有找到漫画标题和链接的<dt>")?;
-        let (id, title, subtitle) = get_id_and_title_and_subtitle(dt)?;
+    let dt = book_detail_div
+        .select(&Selector::parse("dt").to_eyre()?)
+        .next()
+        .ok_or_eyre("没有找到漫画标题和链接的<dt>")?;
+    let (id, title, subtitle) = get_id_and_title_and_subtitle(dt)?;
 
-        let cover_src = li
-            .select(&Selector::parse(".book-cover img").to_eyre()?)
-            .next()
-            .ok_or_eyre("没有找到封面的<img>")?
-            .value()
-            .attr("src")
-            .ok_or_eyre("没有在封面的<img>中找到src属性")?;
-        let cover = format!("https:{cover_src}");
+    let cover_src = li
+        .select(&Selector::parse(".book-cover img").to_eyre()?)
+        .next()
+        .ok_or_eyre("没有找到封面的<img>")?
+        .value()
+        .attr("src")
+        .ok_or_eyre("没有在封面的<img>中找到src属性")?;
+    let cover = format!("https:{cover_src}");
 
-        let dds = book_detail_div
-            .select(&Selector::parse("dd").to_eyre()?)
-            .collect::<Vec<_>>();
+    let dds = book_detail_div
+        .select(&Selector::parse("dd").to_eyre()?)
+        .collect::<Vec<_>>();
 
-        let status_dd = dds.first().ok_or_eyre("没有找到漫画状态和更新时间的dd")?;
-        let (status, update_time) = get_status_and_update_time(status_dd)?;
+    let status_dd = dds.first().ok_or_eyre("没有找到漫画状态和更新时间的dd")?;
+    let (status, update_time) = get_status_and_update_time(status_dd)?;
 
-        let info_dd = dds.get(1).ok_or_eyre("没有找到年份、地区、类型的dd")?;
-        let (year, region, genres) = get_year_and_region_and_genres(info_dd)?;
+    let info_dd = dds.get(1).ok_or_eyre("没有找到年份、地区、类型的dd")?;
+    let (year, region, genres) = get_year_and_region_and_genres(info_dd)?;
 
-        let authors = dds
-            .get(2)
-            .ok_or_eyre("没有找到作者的<dd>")?
-            .select(&Selector::parse("a").to_eyre()?)
-            .filter_map(|a| a.value().attr("title").map(str::to_string))
-            .collect::<Vec<_>>();
+    let authors = dds
+        .get(2)
+        .ok_or_eyre("没有找到作者的<dd>")?
+        .select(&Selector::parse("a").to_eyre()?)
+        .filter_map(|a| a.value().attr("title").map(str::to_string))
+        .collect::<Vec<_>>();
 
-        let aliases = dds
-            .get(3)
-            .ok_or_eyre("没有找到别名的<dd>")?
-            .select(&Selector::parse("a").to_eyre()?)
-            .filter_map(|a| a.text().next().map(|text| text.trim().to_string()))
-            .collect::<Vec<_>>();
+    let aliases = dds
+        .get(3)
+        .ok_or_eyre("没有找到别名的<dd>")?
+        .select(&Selector::parse("a").to_eyre()?)
+        .filter_map(|a| a.text().next().map(|text| text.trim().to_string()))
+        .collect::<Vec<_>>();
 
-        let intro = book_detail_div
-            .select(&Selector::parse(".intro span").to_eyre()?)
-            .next()
-            .ok_or_eyre("没有找到简介的<span>")?
-            .text()
-            .nth(1)
-            .ok_or_eyre("没有在简介的<span>中找到文本")?
-            .trim()
-            .trim_end_matches('[')
-            .to_string();
+    let intro = book_detail_div
+        .select(&Selector::parse(".intro span").to_eyre()?)
+        .next()
+        .ok_or_eyre("没有找到简介的<span>")?
+        .text()
+        .nth(1)
+        .ok_or_eyre("没有在简介的<span>中找到文本")?
+        .trim()
+        .trim_end_matches('[')
+        .to_string();
 
-        let mut comic = ComicInSearch {
-            id,
-            title,
-            subtitle,
-            cover,
-            status,
-            update_time,
-            year,
-            region,
-            genres,
-            authors,
-            aliases,
-            intro,
-            is_downloaded: false,
-            comic_download_dir: PathBuf::new(),
-        };
+    let mut comic = ComicInSearch {
+        id,
+        title,
+        subtitle,
+        cover,
+        status,
+        update_time,
+        year,
+        region,
+        genres,
+        authors,
+        aliases,
+        intro,
+        is_downloaded: false,
+        comic_download_dir: PathBuf::new(),
+    };
 
-        comic.update_fields(id_to_dir_map);
+    comic.update_fields(id_to_dir_map);
 
-        Ok(comic)
-    }
-
-    pub fn update_fields(&mut self, id_to_dir_map: &HashMap<i64, PathBuf>) {
-        if let Some(comic_download_dir) = id_to_dir_map.get(&self.id) {
-            self.comic_download_dir = comic_download_dir.clone();
-            self.is_downloaded = true;
-        }
-    }
+    Ok(comic)
 }
 
 #[instrument(level = "error", skip_all)]

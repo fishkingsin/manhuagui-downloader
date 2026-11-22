@@ -1,0 +1,42 @@
+{
+  "id": 67890,
+  "title": "测试漫画",
+  "subtitle": "测试副标题",
+  "cover": "https://example.com/cover.jpg",
+  "status": "连载中",
+  "updateTime": "2026-11-22",
+  "year": 2024,
+  "region": "日本",
+  "genres": [
+    "热血",
+    "冒险"
+  ],
+  "authors": [
+    "测试作者"
+  ],
+  "aliases": [
+    "别名1"
+  ],
+  "intro": "这是一段漫画简介。",
+  "groups": {
+    "单话": [
+      {
+        "chapterId": 12345,
+        "chapterTitle": "第01话",
+        "chapterSize": 25,
+        "comicId": 67890,
+        "comicTitle": "测试漫画",
+        "groupName": "单话",
+        "groupSize": 10,
+        "order": 1.0,
+        "comicStatus": "连载中",
+        "isPdfExported": false,
+        "isCbzExported": true,
+        "isDownloaded": true,
+        "chapterDownloadDir": "/path/to/chapter"
+      }
+    ]
+  },
+  "isDownloaded": true,
+  "comicDownloadDir": "/path/to/comic"
+}

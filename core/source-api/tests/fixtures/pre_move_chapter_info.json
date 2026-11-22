@@ -1,0 +1,15 @@
+{
+  "chapterId": 12345,
+  "chapterTitle": "第01话",
+  "chapterSize": 25,
+  "comicId": 67890,
+  "comicTitle": "测试漫画",
+  "groupName": "单话",
+  "groupSize": 10,
+  "order": 1.0,
+  "comicStatus": "连载中",
+  "isPdfExported": false,
+  "isCbzExported": true,
+  "isDownloaded": true,
+  "chapterDownloadDir": "/path/to/chapter"
+}

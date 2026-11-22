@@ -14,7 +14,9 @@ use crate::{
     config::ProxyMode,
     decrypt::decrypt,
     extensions::{AppHandleExt, EyreReportToMessage, SendWithTimeoutMsg},
-    types::{ChapterInfo, Comic, GetFavoriteResult, SearchResult, UserProfile},
+    types::{
+        ChapterInfo, Comic, ComicExt, GetFavoriteResult, SearchResult, SearchResultExt, UserProfile,
+    },
 };
 
 #[derive(Clone)]

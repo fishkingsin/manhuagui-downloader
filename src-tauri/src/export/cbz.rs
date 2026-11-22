@@ -133,7 +133,7 @@ fn cbz_internal(
 
     let extension = ExportFormat::Cbz.extension();
     let comic_export_dir = comic
-        .get_comic_export_dir(app)
+        .get_comic_export_dir(&app.get_core_config())
         .wrap_err("获取导出目录失败")?;
     let cbz_export_dir = comic_export_dir.join(extension);
 

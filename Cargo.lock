@@ -567,8 +567,10 @@ checksum = "7e36cc9d416881d2e24f9a963be5fb1cd90966419ac844274161d10488b3e825"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -2361,6 +2363,7 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
+ "source-api",
  "specta",
  "specta-typescript",
  "specta-util",
@@ -4080,9 +4083,16 @@ dependencies = [
 name = "source-api"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "eyre",
+ "regex",
  "serde",
+ "serde_json",
  "specta",
+ "specta-util",
+ "strfmt",
+ "tracing",
+ "walkdir",
 ]
 
 [[package]]
@@ -4095,6 +4105,7 @@ version = "2.0.0-rc.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ccbb212565d2dc177bc15ecb7b039d66c4490da892436a4eee5b394d620c9bc"
 dependencies = [
+ "chrono",
  "paste",
  "serde_json",
  "specta-macros",

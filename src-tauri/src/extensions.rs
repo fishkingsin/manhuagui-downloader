@@ -56,6 +56,7 @@ impl SendWithTimeoutMsg for RequestBuilder {
 
 pub trait AppHandleExt {
     fn get_config(&self) -> State<'_, RwLock<Config>>;
+    fn get_core_config(&self) -> source_api::CoreConfig;
     fn get_manhuagui_client(&self) -> State<'_, ManhuaguiClient>;
     fn get_download_manager(&self) -> State<'_, DownloadManager>;
     fn get_export_lock(&self) -> State<'_, ComicExportLock>;
@@ -64,6 +65,10 @@ pub trait AppHandleExt {
 impl AppHandleExt for tauri::AppHandle {
     fn get_config(&self) -> State<'_, RwLock<Config>> {
         self.state::<RwLock<Config>>()
+    }
+    fn get_core_config(&self) -> source_api::CoreConfig {
+        let config = self.get_config().read().clone();
+        (&config).into()
     }
     fn get_manhuagui_client(&self) -> State<'_, ManhuaguiClient> {
         self.state::<ManhuaguiClient>()
@@ -78,6 +83,7 @@ impl AppHandleExt for tauri::AppHandle {
 
 pub trait WalkDirEntryExt {
     fn is_comic_metadata(&self) -> bool;
+    #[allow(dead_code)]
     fn is_chapter_metadata(&self) -> bool;
 }
 impl WalkDirEntryExt for walkdir::DirEntry {
