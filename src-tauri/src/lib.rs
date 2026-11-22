@@ -1,6 +1,5 @@
 mod commands;
 mod config;
-mod decrypt;
 mod downloader;
 mod errors;
 mod events;

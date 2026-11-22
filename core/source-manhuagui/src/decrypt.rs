@@ -44,9 +44,9 @@ pub struct DecryptResult {
 #[serde(rename_all = "camelCase")]
 pub struct Sl {
     /// 看起来是时间戳
-    e: i64,
+    pub e: i64,
     /// 不知道有啥用 (`agr1qEo-yIKXp_vfN6HbYg`)
-    m: String,
+    pub m: String,
 }
 
 #[instrument(level = "error", skip_all)]

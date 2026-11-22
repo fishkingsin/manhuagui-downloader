@@ -2364,6 +2364,7 @@ dependencies = [
  "serde",
  "serde_json",
  "source-api",
+ "source-manhuagui",
  "specta",
  "specta-typescript",
  "specta-util",
@@ -4097,6 +4098,16 @@ dependencies = [
 [[package]]
 name = "source-manhuagui"
 version = "0.1.0"
+dependencies = [
+ "eyre",
+ "lz-str",
+ "regex",
+ "scraper",
+ "serde",
+ "serde_json",
+ "source-api",
+ "tracing",
+]
 
 [[package]]
 name = "specta"

@@ -12,11 +12,9 @@ use tracing::instrument;
 
 use crate::{
     config::ProxyMode,
-    decrypt::decrypt,
     extensions::{AppHandleExt, EyreReportToMessage, SendWithTimeoutMsg},
-    types::{
-        ChapterInfo, Comic, ComicExt, GetFavoriteResult, SearchResult, SearchResultExt, UserProfile,
-    },
+    types::{ChapterInfo, Comic, GetFavoriteResult, SearchResult, UserProfile},
+    utils,
 };
 
 #[derive(Clone)]
@@ -121,8 +119,12 @@ impl ManhuaguiClient {
         if status != StatusCode::OK {
             return Err(eyre!("预料之外的状态码({status}): {body}"));
         }
-        let search_result =
-            SearchResult::from_html(&self.app, &body).wrap_err("将body转换为SearchResult失败")?;
+        let mut search_result =
+            source_manhuagui::parse_search(&body, page_num).wrap_err("将body转换为SearchResult失败")?;
+        let id_to_dir_map = utils::create_id_to_dir_map(&self.app)?;
+        for comic in &mut search_result.comics {
+            comic.update_fields(&id_to_dir_map);
+        }
         Ok(search_result)
     }
 
@@ -138,7 +140,15 @@ impl ManhuaguiClient {
         if status != StatusCode::OK {
             return Err(eyre!("预料之外的状态码({status}): {body}"));
         }
-        let comic = Comic::from_html(&self.app, &body).wrap_err("将body转换为Comic失败")?;
+        let mut comic = source_manhuagui::parse_comic(&body).wrap_err("将body转换为Comic失败")?;
+        let id_to_dir_map = utils::create_id_to_dir_map(&self.app)?;
+        // TODO: 这是为了兼容v0.4.2及之前的版本，后续需要移除，计划在v0.6.0之后移除
+        if let Some(comic_download_dir) = id_to_dir_map.get(&comic.id) {
+            comic
+                .create_chapter_metadata_for_old_version(comic_download_dir)
+                .wrap_err("为旧版本创建章节元数据失败")?;
+        }
+        comic.update_fields(&id_to_dir_map)?;
 
         Ok(comic)
     }
@@ -166,7 +176,7 @@ impl ManhuaguiClient {
             return Err(eyre!("预料之外的状态码({status}): {body}"));
         }
 
-        let decrypt_result = decrypt(&body).wrap_err("解密失败")?;
+        let decrypt_result = source_manhuagui::decrypt(&body).wrap_err("解密失败")?;
 
         let urls = decrypt_result
             .files
