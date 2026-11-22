@@ -4,12 +4,24 @@ use std::{
 };
 
 use eyre::{OptionExt, WrapErr};
-use regex::Regex;
 use tracing::instrument;
 
 pub fn filename_filter(s: &str) -> String {
-    let re = Regex::new(r#"[\\/:*?"<>|.]"#).unwrap();
-    re.replace_all(s, "_").to_string()
+    s.chars()
+        .map(|c| match c {
+            '\\' | '/' => ' ',
+            ':' => '：',
+            '*' => '⭐',
+            '?' => '？',
+            '"' => '\'',
+            '<' => '《',
+            '>' => '》',
+            '|' => '丨',
+            _ => c,
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
 }
 
 #[instrument(level = "error", skip_all)]

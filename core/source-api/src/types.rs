@@ -13,6 +13,7 @@ use crate::{config::CoreConfig, utils::filename_filter};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct ComicId {
     pub source_id: String,
@@ -21,6 +22,7 @@ pub struct ComicId {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub enum UpdateWindow {
     Days7,
@@ -31,6 +33,7 @@ pub enum UpdateWindow {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct ComicSummary {
     pub comic_id: ComicId,
@@ -43,6 +46,7 @@ pub struct ComicSummary {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct BrowseResult {
     pub items: Vec<ComicSummary>,
@@ -52,6 +56,7 @@ pub struct BrowseResult {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct PageRef {
     pub url: String,
@@ -60,6 +65,7 @@ pub struct PageRef {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct ChapterPages {
     pub pages: Vec<PageRef>,
@@ -69,6 +75,7 @@ pub struct ChapterPages {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 pub enum DownloadTaskState {
     Pending,
     Downloading,
@@ -79,6 +86,7 @@ pub enum DownloadTaskState {
 
 #[derive(Default, Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 pub struct ChapterDirFmtParams {
     pub comic_id: i64,
     pub comic_title: String,
@@ -94,6 +102,7 @@ pub struct ChapterDirFmtParams {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct ChapterInfo {
     /// 章节id
@@ -341,6 +350,7 @@ impl ChapterInfo {
 
 #[derive(Default, Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 pub struct ComicDirFmtParams {
     pub comic_id: i64,
     pub comic_title: String,
@@ -352,6 +362,7 @@ pub struct ComicDirFmtParams {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct Comic {
     /// 漫画id
@@ -747,6 +758,7 @@ impl Comic {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct ComicInSearch {
     /// 漫画id
@@ -792,6 +804,7 @@ impl ComicInSearch {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[cfg_attr(feature = "specta", specta(export = false))]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResult {
     pub comics: Vec<ComicInSearch>,

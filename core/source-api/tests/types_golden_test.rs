@@ -207,3 +207,16 @@ fn test_new_domain_types() {
     let des_pages: ChapterPages = serde_json::from_str(&json_pages).unwrap();
     assert_eq!(des_pages, chapter_pages);
 }
+
+#[test]
+fn test_filename_filter_character_substitutions() {
+    assert_eq!(
+        source_api::filename_filter(r#"  \/:*?"<>|  "#),
+        "：⭐？'《》丨"
+    );
+    assert_eq!(
+        source_api::filename_filter(r#"hello/world\test:star*q?quote"lt<gt>pipe|dot.txt"#),
+        "hello world test：star⭐q？quote'lt《gt》pipe丨dot.txt"
+    );
+}
+

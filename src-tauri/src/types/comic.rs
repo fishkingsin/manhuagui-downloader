@@ -5,10 +5,10 @@ use scraper::{ElementRef, Html, Selector};
 use tauri::AppHandle;
 use tracing::instrument;
 
-use crate::{extensions::ToEyre, types::ChapterInfo, utils};
+use crate::{extensions::ToEyre, types::ChapterInfo, utils::{self, filename_filter}};
 
 #[allow(unused_imports)]
-pub use source_api::{filename_filter, Comic, ComicDirFmtParams};
+pub use source_api::{Comic, ComicDirFmtParams};
 
 pub trait ComicExt {
     fn from_html(app: &AppHandle, html: &str) -> eyre::Result<Comic>;
