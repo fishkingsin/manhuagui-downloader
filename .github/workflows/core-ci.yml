@@ -1,0 +1,59 @@
+name: Core CI
+
+# Runs on every push and pull request. The Rust core crates
+# (source-api, source-manhuagui, library) are gated on formatting and
+# clippy with -D warnings; the desktop shell is only compiled (its clippy
+# lints are advisory — upstream code carries pre-existing allows).
+#
+# All tests are network-free: they run against checked-in HTML fixtures and
+# directly-constructed domain values, never live manhuagui.com.
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: cargo fmt --check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: cargo clippy (core crates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # Gate the three core crates on -D warnings. src-tauri clippy is
+      # intentionally not part of this gate (advisory only).
+      - run: cargo clippy -p source-api -p source-manhuagui -p library -- -D warnings
+
+  test:
+    name: cargo test --workspace
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install webkit2gtk system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace
+
+  build:
+    name: cargo build (desktop shell)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install webkit2gtk system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build -p manhuagui-downloader

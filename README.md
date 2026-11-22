@@ -73,6 +73,8 @@ pnpm install
 pnpm tauri build
 ```
 
+**Workspace layout.** The Rust code is a Cargo workspace: `core/source-api` holds the source-agnostic domain types, `CoreConfig`, the `Source` trait, and structured errors; `core/source-manhuagui` is the manhuagui adapter (HTTP client, p.a.c.k.e.r decryption, HTML parsing, and `/list/` browsing); `core/library` holds the source registry, the 7/15/30-day windowed browse engine, the downloader, and the exporters. `src-tauri/` is the desktop shell — Tauri commands, frontend config, and event bindings — which now calls into the core crates.
+
 # 🤝 提交PR
 
 **PR请提交至`develop`分支**
