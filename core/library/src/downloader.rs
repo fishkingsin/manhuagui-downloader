@@ -10,7 +10,7 @@ use parking_lot::RwLock;
 use reqwest_middleware::ClientWithMiddleware;
 use tokio::sync::Semaphore;
 
-use source_api::{CoreConfig, EventObserver};
+use source_api::{CoreConfig, EventObserver, PageFetcher};
 
 /// Returns a handle to the current Tokio runtime, or a library-owned fallback
 /// runtime when the caller is not inside one (e.g. during desktop app setup).
@@ -43,6 +43,7 @@ where
 pub struct DownloadDeps {
     pub config: Arc<RwLock<CoreConfig>>,
     pub observer: Arc<dyn EventObserver>,
+    pub fetcher: Arc<dyn PageFetcher>,
     pub chapter_sem: Arc<Semaphore>,
     pub img_sem: Arc<Semaphore>,
     pub byte_per_sec: Arc<AtomicU64>,

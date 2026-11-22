@@ -15,7 +15,7 @@ use tokio::{
 };
 use tracing::instrument;
 
-use source_api::{ChapterInfo, Comic, DownloadTaskState, LibraryEvent, PageRef};
+use source_api::{ChapterInfo, Comic, DownloadTaskState, LibraryEvent};
 
 use crate::{
     downloader::{download_img_task::DownloadImgTask, DownloadDeps, EyreReportToMessage},
@@ -29,7 +29,6 @@ pub struct DownloadTask {
     pub deps: DownloadDeps,
     pub comic: Arc<Comic>,
     pub chapter_info: Arc<ChapterInfo>,
-    pub pages: Vec<PageRef>,
     pub state_sender: watch::Sender<DownloadTaskState>,
     pub delete_sender: watch::Sender<()>,
     pub downloaded_img_count: Arc<AtomicU32>,
@@ -42,12 +41,7 @@ impl DownloadTask {
         skip_all,
         fields(comic_id = comic.id, comic_title = comic.title, chapter_id = chapter_id)
     )]
-    pub fn new(
-        deps: DownloadDeps,
-        mut comic: Comic,
-        chapter_id: i64,
-        pages: Vec<PageRef>,
-    ) -> eyre::Result<Arc<Self>> {
+    pub fn new(deps: DownloadDeps, mut comic: Comic, chapter_id: i64) -> eyre::Result<Arc<Self>> {
         comic.ensure_download_dir_fields(&deps.config.read())?;
 
         let chapter_info = comic
@@ -65,7 +59,6 @@ impl DownloadTask {
             deps,
             comic: Arc::new(comic),
             chapter_info: Arc::new(chapter_info),
-            pages,
             state_sender,
             delete_sender,
             downloaded_img_count: Arc::new(AtomicU32::new(0)),
@@ -145,16 +138,30 @@ impl DownloadTask {
             return;
         }
 
+        let pages = match self.deps.fetcher.fetch_pages(&self.chapter_info).await {
+            Ok(pages) => pages,
+            Err(err) => {
+                let err_title = "获取图片链接失败";
+                let message = err.to_message();
+                tracing::error!(err_title, message);
+
+                self.set_state(DownloadTaskState::Failed);
+                self.emit_download_task_update_event();
+
+                return;
+            }
+        };
+
         #[allow(clippy::cast_possible_truncation)]
         self.total_img_count
-            .store(self.pages.len() as u32, Ordering::Relaxed);
+            .store(pages.len() as u32, Ordering::Relaxed);
 
         let Some(temp_download_dir) = self.create_temp_download_dir() else {
             return;
         };
 
         let mut join_set = JoinSet::new();
-        for (i, page) in self.pages.clone().into_iter().enumerate() {
+        for (i, page) in pages.into_iter().enumerate() {
             let download_img_task =
                 DownloadImgTask::new(self.clone(), page, i, temp_download_dir.clone());
             join_set.spawn(download_img_task.process());

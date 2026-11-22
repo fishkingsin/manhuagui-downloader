@@ -102,12 +102,13 @@ pub fn run() {
             app.manage(config);
 
             let manhuagui_client = Arc::new(ManhuaguiClient::new(&core_config));
-            app.manage(manhuagui_client);
 
             let download_manager = DownloadManager::new(
                 Arc::new(RwLock::new(core_config.clone())),
+                manhuagui_client.clone() as Arc<dyn source_api::PageFetcher>,
                 Arc::new(CoreObserver::new(app.handle().clone())),
             );
+            app.manage(manhuagui_client);
             app.manage(download_manager);
 
             let export_lock = ComicExportLock::new();

@@ -487,6 +487,13 @@ impl ManhuaguiClient {
     }
 }
 
+#[async_trait::async_trait]
+impl source_api::PageFetcher for ManhuaguiClient {
+    async fn fetch_pages(&self, chapter_info: &ChapterInfo) -> eyre::Result<Vec<PageRef>> {
+        self.get_img_urls(chapter_info).await
+    }
+}
+
 fn create_api_client(config: &CoreConfig) -> ClientWithMiddleware {
     let retry_policy = ExponentialBackoff::builder()
         .base(1) // 指数为1，保证重试间隔为1秒不变

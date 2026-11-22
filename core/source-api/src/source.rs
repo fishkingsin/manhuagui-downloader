@@ -2,7 +2,10 @@ use chrono::NaiveDate;
 
 use crate::{
     error::SourceError,
-    types::{BrowseResult, ChapterPages, Comic, ComicSummary, SearchResult, UpdateWindow},
+    types::{
+        BrowseResult, ChapterInfo, ChapterPages, Comic, ComicSummary, PageRef, SearchResult,
+        UpdateWindow,
+    },
 };
 
 #[async_trait::async_trait]
@@ -29,6 +32,17 @@ pub trait Source: Send + Sync {
         native_id: i64,
         chapter_id: i64,
     ) -> Result<ChapterPages, SourceError>;
+}
+
+/// Fetches the page image references for a chapter (network + decrypt), in
+/// display order.
+///
+/// The downloader injects this so it can fetch pages *inside* a task's
+/// background processing — after the duplicate-task check and the `TaskCreate`
+/// event — without importing the site adapter crate.
+#[async_trait::async_trait]
+pub trait PageFetcher: Send + Sync {
+    async fn fetch_pages(&self, chapter_info: &ChapterInfo) -> eyre::Result<Vec<PageRef>>;
 }
 
 /// Returns true when ALL items' `updated_on` are older than the window cutoff.

@@ -13,7 +13,7 @@ use reqwest_middleware::ClientWithMiddleware;
 use tokio::sync::Semaphore;
 use tracing::instrument;
 
-use source_api::{Comic, CoreConfig, EventObserver, LibraryEvent, PageRef};
+use source_api::{Comic, CoreConfig, EventObserver, LibraryEvent, PageFetcher};
 
 use crate::{
     downloader::{
@@ -26,6 +26,7 @@ use crate::{
 pub struct DownloadManager {
     pub config: Arc<RwLock<CoreConfig>>,
     pub observer: Arc<dyn EventObserver>,
+    pub fetcher: Arc<dyn PageFetcher>,
     pub img_client: Arc<RwLock<ClientWithMiddleware>>,
     pub chapter_sem: Arc<Semaphore>,
     pub img_sem: Arc<Semaphore>,
@@ -34,7 +35,11 @@ pub struct DownloadManager {
 }
 
 impl DownloadManager {
-    pub fn new(config: Arc<RwLock<CoreConfig>>, observer: Arc<dyn EventObserver>) -> Self {
+    pub fn new(
+        config: Arc<RwLock<CoreConfig>>,
+        fetcher: Arc<dyn PageFetcher>,
+        observer: Arc<dyn EventObserver>,
+    ) -> Self {
         let (chapter_concurrency, img_concurrency) = {
             let config = config.read();
             (config.chapter_concurrency, config.img_concurrency)
@@ -46,6 +51,7 @@ impl DownloadManager {
             img_client: Arc::new(RwLock::new(img_client)),
             config,
             observer,
+            fetcher,
             chapter_sem: Arc::new(Semaphore::new(chapter_concurrency)),
             img_sem: Arc::new(Semaphore::new(img_concurrency)),
             byte_per_sec: Arc::new(AtomicU64::new(0)),
@@ -77,6 +83,7 @@ impl DownloadManager {
         DownloadDeps {
             config: self.config.clone(),
             observer: self.observer.clone(),
+            fetcher: self.fetcher.clone(),
             chapter_sem: self.chapter_sem.clone(),
             img_sem: self.img_sem.clone(),
             byte_per_sec: self.byte_per_sec.clone(),
@@ -89,12 +96,7 @@ impl DownloadManager {
         skip_all,
         fields(comic_id = comic.id, comic_title = comic.title, chapter_id = chapter_id)
     )]
-    pub fn create_download_task(
-        &self,
-        comic: Comic,
-        chapter_id: i64,
-        pages: Vec<PageRef>,
-    ) -> eyre::Result<()> {
+    pub fn create_download_task(&self, comic: Comic, chapter_id: i64) -> eyre::Result<()> {
         use DownloadTaskState::{Downloading, Paused, Pending};
 
         let mut tasks = self.download_tasks.write();
@@ -112,7 +114,7 @@ impl DownloadManager {
                 .wrap_err("通知旧下载任务删除失败")?;
         }
 
-        let task = DownloadTask::new(self.deps(), comic, chapter_id, pages)?;
+        let task = DownloadTask::new(self.deps(), comic, chapter_id)?;
         tasks.insert(chapter_id, task);
         Ok(())
     }
