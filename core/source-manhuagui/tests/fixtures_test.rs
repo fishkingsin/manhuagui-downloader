@@ -50,3 +50,41 @@ fn test_parse_search() {
         ]
     );
 }
+
+#[test]
+fn test_parse_list_page() {
+    let html = include_str!("fixtures/list_japan.html");
+    let res = source_manhuagui::parse_list_page(html).expect("parse_list_page should succeed");
+    assert!(res.items.len() >= 20, "expected >= 20 items, got {}", res.items.len());
+
+    let first = &res.items[0];
+    assert_eq!(first.comic_id.native_id, 24558);
+    assert_eq!(first.title, "转生奇谭");
+    assert!(first.cover_url.starts_with("https:"));
+    assert_eq!(first.status_line, "更新至第70话机翻");
+    assert_eq!(
+        first.updated_on,
+        Some(chrono::NaiveDate::from_ymd_opt(2026, 11, 22).unwrap())
+    );
+    assert_eq!(first.rating, Some(9.0));
+    assert!(res.total_pages > 1000);
+}
+
+#[test]
+fn test_parse_list_page_missing_date() {
+    let html = include_str!("fixtures/list_missing_date.html");
+    let res = source_manhuagui::parse_list_page(html).expect("parse_list_page should succeed");
+    assert_eq!(res.items.len(), 3);
+
+    // First item has valid date
+    assert_eq!(
+        res.items[0].updated_on,
+        Some(chrono::NaiveDate::from_ymd_opt(2026, 11, 22).unwrap())
+    );
+    // Second item has missing date
+    assert_eq!(res.items[1].updated_on, None);
+    // Third item has unparseable date
+    assert_eq!(res.items[2].updated_on, None);
+    assert_eq!(res.items[2].rating, Some(6.0));
+}
+

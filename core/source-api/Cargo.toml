@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-trait = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 eyre = { workspace = true }
 regex = { workspace = true }
@@ -16,4 +17,8 @@ walkdir = { version = "2.5.0" }
 
 [features]
 specta = ["dep:specta"]
+
+[dev-dependencies]
+tokio = { workspace = true }
+
 

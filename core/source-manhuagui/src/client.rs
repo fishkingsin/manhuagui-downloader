@@ -305,6 +305,20 @@ impl ManhuaguiClient {
         *self.config.write() = config.clone();
     }
 
+    #[instrument(level = "error", skip_all, fields(url = url))]
+    pub async fn get_html(&self, url: &str) -> eyre::Result<String> {
+        let request = self.api_client.read().get(url);
+        let http_resp = request.send_with_timeout_msg().await?;
+        let status = http_resp.status();
+        let body = http_resp.text().await?;
+        if status == StatusCode::NOT_FOUND {
+            return Err(eyre!("404 Not Found: {url}"));
+        } else if status != StatusCode::OK {
+            return Err(eyre!("预料之外的状态码({status}): {body}"));
+        }
+        Ok(body)
+    }
+
     #[instrument(level = "error", skip_all)]
     pub async fn login(&self, username: &str, password: &str) -> eyre::Result<String> {
         let params = json!({"action": "user_login"});

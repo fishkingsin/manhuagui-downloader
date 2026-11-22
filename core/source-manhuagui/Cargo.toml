@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
 source-api = { workspace = true }
 scraper = { workspace = true }
 lz-str = { workspace = true }
@@ -21,4 +23,8 @@ specta = { workspace = true, optional = true, features = ["derive"] }
 
 [features]
 specta = ["dep:specta", "source-api/specta"]
+
+[dev-dependencies]
+tokio = { workspace = true }
+
 
