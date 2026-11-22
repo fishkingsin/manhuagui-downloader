@@ -8,6 +8,14 @@ use crate::{
 #[async_trait::async_trait]
 pub trait Source: Send + Sync {
     fn id(&self) -> &'static str;
+
+    /// "Today" in the source's local timezone, used as the window reference
+    /// date. Sources whose site dates are in a non-local timezone override
+    /// this (see `ManhuaguiSource`, which uses Asia/Shanghai).
+    fn today(&self) -> NaiveDate {
+        chrono::Local::now().date_naive()
+    }
+
     async fn search(&self, keyword: &str, page: i64) -> Result<SearchResult, SourceError>;
     async fn browse_latest(
         &self,

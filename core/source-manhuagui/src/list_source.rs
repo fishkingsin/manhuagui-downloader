@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::{FixedOffset, Utc};
 use source_api::{
     BrowseResult, ChapterPages, Comic, SearchResult, Source, SourceError, UpdateWindow,
 };
@@ -78,6 +79,12 @@ pub fn map_eyre_to_source_error(err: eyre::Report) -> SourceError {
 impl Source for ManhuaguiSource {
     fn id(&self) -> &'static str {
         "manhuagui"
+    }
+
+    /// manhuagui's `更新于` dates are Asia/Shanghai (UTC+8, no DST).
+    fn today(&self) -> chrono::NaiveDate {
+        let offset = FixedOffset::east_opt(8 * 3600).expect("UTC+8 is a valid fixed offset");
+        Utc::now().with_timezone(&offset).date_naive()
     }
 
     async fn search(&self, keyword: &str, page: i64) -> Result<SearchResult, SourceError> {

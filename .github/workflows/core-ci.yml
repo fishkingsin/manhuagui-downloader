@@ -1,9 +1,10 @@
 name: Core CI
 
-# Runs on every push and pull request. The Rust core crates
-# (source-api, source-manhuagui, library) are gated on formatting and
-# clippy with -D warnings; the desktop shell is only compiled (its clippy
-# lints are advisory — upstream code carries pre-existing allows).
+# Runs on every push and pull request. Formatting is enforced on the whole
+# workspace (`cargo fmt --all -- --check`); clippy with -D warnings gates only
+# the three core crates (source-api, source-manhuagui, library); the desktop
+# shell is only compiled (its clippy lints are advisory — upstream code carries
+# pre-existing allows).
 #
 # All tests are network-free: they run against checked-in HTML fixtures and
 # directly-constructed domain values, never live manhuagui.com.

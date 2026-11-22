@@ -36,11 +36,16 @@ fn page(page: i64, total_pages: i64, items: Vec<ComicSummary>) -> BrowseResult {
     }
 }
 
-/// A date `n` days before "today". `n=1` is unambiguously inside a Days7
-/// window and `n=20` unambiguously outside, regardless of whether "today" is
-/// taken in UTC or Asia/Shanghai (the two differ by at most one calendar day).
+/// A fixed reference "today", so the window tests are fully deterministic
+/// and independent of the real clock.
+fn fixed_today() -> NaiveDate {
+    NaiveDate::from_ymd_opt(2026, 11, 22).expect("valid date")
+}
+
+/// A date `n` days before the fixed reference "today" (`n=1` is inside a Days7
+/// window; `n=20` is outside).
 fn days_ago(n: i64) -> NaiveDate {
-    chrono::Utc::now().date_naive() - chrono::Duration::days(n)
+    fixed_today() - chrono::Duration::days(n)
 }
 
 /// A `Source` served from static fixture pages, with a fetch counter so tests
@@ -48,6 +53,7 @@ fn days_ago(n: i64) -> NaiveDate {
 struct MockSource {
     pages: Vec<BrowseResult>,
     fetch_count: AtomicUsize,
+    today: NaiveDate,
 }
 
 impl MockSource {
@@ -55,6 +61,7 @@ impl MockSource {
         Self {
             pages,
             fetch_count: AtomicUsize::new(0),
+            today: fixed_today(),
         }
     }
 
@@ -67,6 +74,10 @@ impl MockSource {
 impl Source for MockSource {
     fn id(&self) -> &'static str {
         "mock"
+    }
+
+    fn today(&self) -> NaiveDate {
+        self.today
     }
 
     async fn search(&self, _keyword: &str, _page: i64) -> Result<SearchResult, SourceError> {

@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::{FixedOffset, NaiveDate, Utc};
 use parking_lot::RwLock;
 use source_api::{page_outside_window, ComicSummary, Source, SourceError, UpdateWindow};
 
@@ -34,13 +33,6 @@ impl Default for Library {
     }
 }
 
-/// "Today" in the site's timezone (Asia/Shanghai, UTC+8, no DST), computed once
-/// per walk so the window cutoff never drifts between pages.
-fn today_shanghai() -> NaiveDate {
-    let offset = FixedOffset::east_opt(8 * 3600).expect("UTC+8 is a valid fixed offset");
-    Utc::now().with_timezone(&offset).date_naive()
-}
-
 /// Browses pages `start_page..` sequentially, collecting items whose
 /// `updated_on` falls inside `window` (inclusive cutoff).
 ///
@@ -50,13 +42,16 @@ fn today_shanghai() -> NaiveDate {
 ///   items are dropped, and the walk stops as soon as a page is entirely
 ///   outside the window ([`page_outside_window`]), or the fetched page is the
 ///   last one, or `max_pages` pages have been fetched (hard cap).
+///
+/// The reference "today" comes from [`Source::today`], computed once at the
+/// start of the walk so the cutoff never drifts between pages.
 pub async fn browse_within(
     source: &dyn Source,
     window: UpdateWindow,
     start_page: i64,
     max_pages: i64,
 ) -> Result<Vec<ComicSummary>, SourceError> {
-    let today = today_shanghai();
+    let today = source.today();
 
     let days = match window {
         UpdateWindow::Days7 => Some(7),
