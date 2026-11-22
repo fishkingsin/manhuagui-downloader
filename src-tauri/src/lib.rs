@@ -128,6 +128,13 @@ mod tests {
 
     #[test]
     fn test_specta_export() {
+        const BINDINGS_PATH: &str = "../src/bindings.ts";
+
+        // Snapshot the committed bindings before regenerating so a wire-contract
+        // drift is reported as a failure, never silently overwritten.
+        let before = std::fs::read_to_string(BINDINGS_PATH)
+            .expect("Failed to read committed typescript bindings before regenerating");
+
         let builder = tauri_specta::Builder::<tauri::Wry>::new()
             .commands(tauri_specta::collect_commands![
                 greet,
@@ -168,8 +175,19 @@ mod tests {
                 specta_typescript::Typescript::default()
                     .bigint(specta_typescript::BigIntExportBehavior::Number)
                     .header("// @ts-nocheck"),
-                "../src/bindings.ts",
+                BINDINGS_PATH,
             )
             .expect("Failed to export typescript bindings");
+
+        let after = std::fs::read_to_string(BINDINGS_PATH)
+            .expect("Failed to read regenerated typescript bindings");
+
+        if before != after {
+            panic!(
+                "wire-contract violation: regenerating specta bindings changed `{BINDINGS_PATH}`. \
+                 A Tauri command or event type changed shape without the committed frontend \
+                 bindings being updated. Commit the regenerated file or fix the type drift."
+            );
+        }
     }
 }
