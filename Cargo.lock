@@ -2257,7 +2257,9 @@ dependencies = [
 name = "library"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bytes",
+ "chrono",
  "eyre",
  "float-ord",
  "image",

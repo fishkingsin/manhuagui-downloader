@@ -7,6 +7,7 @@ edition = "2021"
 source-api = { workspace = true }
 eyre = { workspace = true }
 parking_lot = { workspace = true }
+chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
@@ -22,3 +23,6 @@ yaserde = { version = "0.11.2", features = ["yaserde_derive"] }
 lopdf = { git = "https://github.com/lanyeeee/lopdf", features = ["embed_image_jpeg"] }
 image = { version = "0.25.2", default-features = false, features = ["jpeg"] }
 float-ord = { version = "0.3.2" }
+
+[dev-dependencies]
+async-trait = { workspace = true }
