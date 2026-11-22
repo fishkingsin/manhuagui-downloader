@@ -4079,6 +4079,11 @@ dependencies = [
 [[package]]
 name = "source-api"
 version = "0.1.0"
+dependencies = [
+ "eyre",
+ "serde",
+ "specta",
+]
 
 [[package]]
 name = "source-manhuagui"
