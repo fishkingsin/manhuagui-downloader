@@ -1,15 +1,16 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
-use bytes::Bytes;
 use eyre::{eyre, OptionExt, WrapErr};
 use parking_lot::RwLock;
-use reqwest::{Response, StatusCode};
-use reqwest_middleware::{ClientWithMiddleware, RequestBuilder};
+use reqwest::StatusCode;
+use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::{policies::ExponentialBackoff, Jitter, RetryTransientMiddleware};
 use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use source_api::{ChapterInfo, Comic, CoreConfig, PageRef, ProxyMode, SearchResult};
+use source_api::{
+    ChapterInfo, Comic, CoreConfig, PageRef, ProxyMode, SearchResult, SendWithTimeoutMsg,
+};
 use tracing::instrument;
 
 use crate::{decrypt, parse_comic, parse_search};
@@ -25,30 +26,6 @@ pub fn img_url(path: &str, file: &str) -> PageRef {
         "https://www.manhuagui.com/".to_string(),
     );
     PageRef { url, headers }
-}
-
-#[allow(async_fn_in_trait)]
-pub trait SendWithTimeoutMsg {
-    /// 发送请求并处理超时错误
-    ///
-    /// - 如果遇到超时错误，返回带有用户友好信息的错误
-    /// - 否则返回原始错误
-    async fn send_with_timeout_msg(self) -> eyre::Result<Response>;
-}
-
-impl SendWithTimeoutMsg for RequestBuilder {
-    #[instrument(level = "error", skip_all)]
-    async fn send_with_timeout_msg(self) -> eyre::Result<Response> {
-        self.send().await.map_err(|e| {
-            if e.is_timeout() || e.is_middleware() {
-                eyre::Report::from(e).wrap_err(
-                    "网络连接超时，可能是未使用代理或IP被封，请使用代理或切换代理线路后重试",
-                )
-            } else {
-                eyre::Report::from(e)
-            }
-        })
-    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -269,7 +246,6 @@ impl ComicInFavorite {
 pub struct ManhuaguiClient {
     config: Arc<RwLock<CoreConfig>>,
     api_client: Arc<RwLock<ClientWithMiddleware>>,
-    img_client: Arc<RwLock<ClientWithMiddleware>>,
 }
 
 impl ManhuaguiClient {
@@ -277,13 +253,9 @@ impl ManhuaguiClient {
         let api_client = create_api_client(config);
         let api_client = Arc::new(RwLock::new(api_client));
 
-        let img_client = create_img_client(config);
-        let img_client = Arc::new(RwLock::new(img_client));
-
         Self {
             config: Arc::new(RwLock::new(config.clone())),
             api_client,
-            img_client,
         }
     }
 
@@ -292,8 +264,6 @@ impl ManhuaguiClient {
         *self.config.write() = config.clone();
         let api_client = create_api_client(config);
         *self.api_client.write() = api_client;
-        let img_client = create_img_client(config);
-        *self.img_client.write() = img_client;
     }
 
     #[instrument(level = "error", skip_all)]
@@ -450,24 +420,6 @@ impl ManhuaguiClient {
         Ok(pages)
     }
 
-    #[instrument(level = "error", skip_all, fields(url = url))]
-    pub async fn get_img_bytes(&self, url: &str) -> eyre::Result<Bytes> {
-        let request = self
-            .img_client
-            .read()
-            .get(url)
-            .header("referer", "https://www.manhuagui.com/");
-        let http_resp = request.send_with_timeout_msg().await?;
-        let status = http_resp.status();
-        if status != StatusCode::OK {
-            let body = http_resp.text().await?;
-            return Err(eyre!("预料之外的状态码({status}): {body}"));
-        }
-        let image_data = http_resp.bytes().await?;
-
-        Ok(image_data)
-    }
-
     #[instrument(level = "error", skip_all, fields(page_num = page_num))]
     pub async fn get_favorite(&self, page_num: i64) -> eyre::Result<GetFavoriteResult> {
         let cookie = self.config.read().cookie.clone();
@@ -504,20 +456,6 @@ fn create_api_client(config: &CoreConfig) -> ClientWithMiddleware {
         .timeout(Duration::from_secs(config.api_timeout_sec))
         .redirect(reqwest::redirect::Policy::none());
     let client = set_proxy(client_builder, config, "api_client")
-        .build()
-        .unwrap();
-
-    reqwest_middleware::ClientBuilder::new(client)
-        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
-        .build()
-}
-
-fn create_img_client(config: &CoreConfig) -> ClientWithMiddleware {
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
-
-    let client_builder =
-        reqwest::ClientBuilder::new().timeout(Duration::from_secs(config.img_timeout_sec));
-    let client = set_proxy(client_builder, config, "img_client")
         .build()
         .unwrap();
 

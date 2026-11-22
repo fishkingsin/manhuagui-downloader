@@ -8,6 +8,8 @@ async-trait = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 eyre = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 specta = { workspace = true, optional = true, features = ["derive", "chrono"] }
