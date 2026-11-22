@@ -9,20 +9,26 @@ use std::{
 
 use eyre::{eyre, WrapErr};
 use parking_lot::RwLock;
-use tauri::AppHandle;
-use tauri_specta::Event;
+use reqwest_middleware::ClientWithMiddleware;
 use tokio::sync::Semaphore;
 use tracing::instrument;
 
+use source_api::{Comic, CoreConfig, EventObserver, LibraryEvent, PageRef};
+
 use crate::{
-    downloader::{download_task::DownloadTask, download_task_state::DownloadTaskState},
-    events::DownloadEvent,
-    extensions::AppHandleExt,
-    types::Comic,
+    downloader::{
+        download_task::DownloadTask,
+        download_task_state::DownloadTaskState,
+        img_client::create_img_client,
+        DownloadDeps,
+    },
+    events::{SpeedPayload, EVENT_SPEED},
 };
 
 pub struct DownloadManager {
-    pub app: AppHandle,
+    pub config: Arc<RwLock<CoreConfig>>,
+    pub observer: Arc<dyn EventObserver>,
+    pub img_client: Arc<RwLock<ClientWithMiddleware>>,
     pub chapter_sem: Arc<Semaphore>,
     pub img_sem: Arc<Semaphore>,
     pub byte_per_sec: Arc<AtomicU64>,
@@ -30,27 +36,54 @@ pub struct DownloadManager {
 }
 
 impl DownloadManager {
-    pub fn new(app: &AppHandle) -> Self {
+    pub fn new(config: Arc<RwLock<CoreConfig>>, observer: Arc<dyn EventObserver>) -> Self {
         let (chapter_concurrency, img_concurrency) = {
-            let config = app.get_config();
             let config = config.read();
             (config.chapter_concurrency, config.img_concurrency)
         };
 
+        let img_client = create_img_client(&config.read());
+
         let manager = DownloadManager {
-            app: app.clone(),
+            img_client: Arc::new(RwLock::new(img_client)),
+            config,
+            observer,
             chapter_sem: Arc::new(Semaphore::new(chapter_concurrency)),
             img_sem: Arc::new(Semaphore::new(img_concurrency)),
             byte_per_sec: Arc::new(AtomicU64::new(0)),
             download_tasks: RwLock::new(HashMap::new()),
         };
 
-        tauri::async_runtime::spawn(Self::emit_download_speed_loop(
-            manager.app.clone(),
+        crate::downloader::spawn(Self::emit_download_speed_loop(
+            manager.observer.clone(),
             manager.byte_per_sec.clone(),
         ));
 
         manager
+    }
+
+    /// Updates the live config snapshot (proxy/timeout/interval changes that do
+    /// not require rebuilding the HTTP client).
+    pub fn update_config(&self, config: &CoreConfig) {
+        *self.config.write() = config.clone();
+    }
+
+    /// Updates the live config snapshot and rebuilds the image HTTP client
+    /// (needed when proxy settings change).
+    pub fn reload_client(&self, config: &CoreConfig) {
+        *self.config.write() = config.clone();
+        *self.img_client.write() = create_img_client(config);
+    }
+
+    fn deps(&self) -> DownloadDeps {
+        DownloadDeps {
+            config: self.config.clone(),
+            observer: self.observer.clone(),
+            chapter_sem: self.chapter_sem.clone(),
+            img_sem: self.img_sem.clone(),
+            byte_per_sec: self.byte_per_sec.clone(),
+            img_client: self.img_client.clone(),
+        }
     }
 
     #[instrument(
@@ -58,7 +91,12 @@ impl DownloadManager {
         skip_all,
         fields(comic_id = comic.id, comic_title = comic.title, chapter_id = chapter_id)
     )]
-    pub fn create_download_task(&self, comic: Comic, chapter_id: i64) -> eyre::Result<()> {
+    pub fn create_download_task(
+        &self,
+        comic: Comic,
+        chapter_id: i64,
+        pages: Vec<PageRef>,
+    ) -> eyre::Result<()> {
         use DownloadTaskState::{Downloading, Paused, Pending};
 
         let mut tasks = self.download_tasks.write();
@@ -76,7 +114,7 @@ impl DownloadManager {
                 .wrap_err("通知旧下载任务删除失败")?;
         }
 
-        let task = DownloadTask::new(self.app.clone(), comic, chapter_id)?;
+        let task = DownloadTask::new(self.deps(), comic, chapter_id, pages)?;
         tasks.insert(chapter_id, task);
         Ok(())
     }
@@ -113,7 +151,7 @@ impl DownloadManager {
         Ok(())
     }
 
-    async fn emit_download_speed_loop(app: AppHandle, byte_per_sec: Arc<AtomicU64>) {
+    async fn emit_download_speed_loop(observer: Arc<dyn EventObserver>, byte_per_sec: Arc<AtomicU64>) {
         let mut interval = tokio::time::interval(Duration::from_secs(1));
 
         loop {
@@ -122,7 +160,12 @@ impl DownloadManager {
             #[allow(clippy::cast_precision_loss)]
             let mega_byte_per_sec = byte_per_sec as f64 / 1024.0 / 1024.0;
             let speed = format!("{mega_byte_per_sec:.2} MB/s");
-            let _ = DownloadEvent::Speed { speed }.emit(&app);
+            if let Ok(payload) = serde_json::to_value(SpeedPayload { speed }) {
+                observer.on_event(&LibraryEvent {
+                    name: EVENT_SPEED,
+                    payload,
+                });
+            }
         }
     }
 }

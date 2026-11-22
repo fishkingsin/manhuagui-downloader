@@ -1,6 +1,5 @@
 mod commands;
 mod config;
-mod downloader;
 mod errors;
 mod events;
 mod export;
@@ -13,16 +12,17 @@ use std::sync::Arc;
 
 use config::Config;
 use eyre::WrapErr;
+use library::downloader::download_manager::DownloadManager;
 use parking_lot::RwLock;
 use source_manhuagui::ManhuaguiClient;
 use tauri::{Manager, Wry};
 
 use crate::{
     commands::*,
-    downloader::download_manager::DownloadManager,
     errors::install_custom_eyre_handler,
     events::{
-        DownloadEvent, ExportCbzEvent, ExportPdfEvent, LogEvent, UpdateDownloadedComicsEvent,
+        CoreObserver, DownloadEvent, ExportCbzEvent, ExportPdfEvent, LogEvent,
+        UpdateDownloadedComicsEvent,
     },
     export::ComicExportLock,
 };
@@ -105,7 +105,10 @@ pub fn run() {
             let manhuagui_client = Arc::new(ManhuaguiClient::new(&core_config));
             app.manage(manhuagui_client);
 
-            let download_manager = DownloadManager::new(app.handle());
+            let download_manager = DownloadManager::new(
+                Arc::new(RwLock::new(core_config.clone())),
+                Arc::new(CoreObserver::new(app.handle().clone())),
+            );
             app.manage(download_manager);
 
             let export_lock = ComicExportLock::new();

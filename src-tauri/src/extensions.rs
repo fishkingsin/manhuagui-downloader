@@ -6,9 +6,9 @@ use scraper::error::SelectorErrorKind;
 use source_manhuagui::ManhuaguiClient;
 use tauri::{Manager, State};
 
-use crate::{
-    config::Config, downloader::download_manager::DownloadManager, export::ComicExportLock,
-};
+use library::downloader::download_manager::DownloadManager;
+
+use crate::{config::Config, export::ComicExportLock};
 
 pub trait EyreReportToMessage {
     fn to_message(&self) -> String;

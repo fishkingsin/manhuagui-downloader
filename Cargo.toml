@@ -23,6 +23,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
 source-api = { path = "core/source-api" }
 source-manhuagui = { path = "core/source-manhuagui" }
+library = { path = "core/library" }
 specta = { version = "2.0.0-rc", features = ["serde_json"] }
 tokio = { version = "1.43.0", features = ["full"] }
 tracing = { version = "0.1.41" }

@@ -2256,6 +2256,19 @@ dependencies = [
 [[package]]
 name = "library"
 version = "0.1.0"
+dependencies = [
+ "bytes",
+ "eyre",
+ "parking_lot 0.12.3",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde",
+ "serde_json",
+ "source-api",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "libredox"
@@ -2350,6 +2363,7 @@ dependencies = [
  "float-ord",
  "image",
  "indexmap 2.13.0",
+ "library",
  "lopdf",
  "lz-str",
  "notify",

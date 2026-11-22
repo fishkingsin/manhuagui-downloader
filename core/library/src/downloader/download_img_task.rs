@@ -4,23 +4,26 @@ use std::{
     time::Duration,
 };
 
-use tauri::AppHandle;
 use tokio::{
     sync::{watch, SemaphorePermit},
     time::sleep,
 };
 use tracing::instrument;
 
-use crate::{
-    downloader::{download_task::DownloadTask, download_task_state::DownloadTaskState},
-    extensions::{AppHandleExt, EyreReportToMessage},
+use source_api::PageRef;
+
+use crate::downloader::{
+    download_task::DownloadTask,
+    download_task_state::DownloadTaskState,
+    img_client::fetch_page_bytes,
+    DownloadDeps,
+    EyreReportToMessage,
 };
-use source_manhuagui::ManhuaguiClient;
 
 pub struct DownloadImgTask {
-    app: AppHandle,
+    deps: DownloadDeps,
     download_task: Arc<DownloadTask>,
-    url: String,
+    page: PageRef,
     index: usize,
     temp_download_dir: PathBuf,
 }
@@ -28,14 +31,14 @@ pub struct DownloadImgTask {
 impl DownloadImgTask {
     pub fn new(
         download_task: Arc<DownloadTask>,
-        url: String,
+        page: PageRef,
         index: usize,
         temp_download_dir: PathBuf,
     ) -> Self {
         Self {
-            app: download_task.app.clone(),
+            deps: download_task.deps.clone(),
             download_task,
-            url,
+            page,
             index,
             temp_download_dir,
         }
@@ -46,7 +49,7 @@ impl DownloadImgTask {
         skip_all,
         fields(
             index = self.index,
-            url = self.url,
+            url = self.page.url,
             comic_id = self.download_task.chapter_info.comic_id,
             comic_title = self.download_task.chapter_info.comic_title,
             group_name = self.download_task.chapter_info.group_name,
@@ -86,8 +89,6 @@ impl DownloadImgTask {
 
     #[instrument(level = "error", skip_all)]
     async fn download_img(&self) {
-        let url = &self.url;
-
         let save_path = self
             .temp_download_dir
             .join(format!("{:03}.jpg", self.index + 1));
@@ -104,7 +105,7 @@ impl DownloadImgTask {
 
         tracing::trace!("开始下载图片");
 
-        let img_data = match self.manhuagui_client().get_img_bytes(url).await {
+        let img_data = match fetch_page_bytes(self.deps.img_client.clone(), &self.page).await {
             Ok(data) => data,
             Err(err) => {
                 let err_title = "下载图片失败";
@@ -125,8 +126,7 @@ impl DownloadImgTask {
 
         tracing::trace!("图片成功保存到磁盘");
 
-        self.app
-            .get_download_manager()
+        self.deps
             .byte_per_sec
             .fetch_add(img_data.len() as u64, Ordering::Relaxed);
 
@@ -136,7 +136,7 @@ impl DownloadImgTask {
 
         self.download_task.emit_download_task_update_event();
 
-        let img_download_interval_sec = self.app.get_config().read().img_download_interval_sec;
+        let img_download_interval_sec = self.deps.config.read().img_download_interval_sec;
         sleep(Duration::from_secs(img_download_interval_sec)).await;
     }
 
@@ -147,9 +147,7 @@ impl DownloadImgTask {
         *permit = match permit.take() {
             Some(permit) => Some(permit),
             None => match self
-                .app
-                .get_download_manager()
-                .inner()
+                .deps
                 .img_sem
                 .acquire()
                 .await
@@ -195,9 +193,5 @@ impl DownloadImgTask {
         }
 
         tracing::trace!("图片下载任务已删除");
-    }
-
-    fn manhuagui_client(&self) -> Arc<ManhuaguiClient> {
-        self.app.get_manhuagui_client().inner().clone()
     }
 }

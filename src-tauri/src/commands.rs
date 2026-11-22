@@ -78,10 +78,13 @@ pub fn save_config(app: AppHandle, config: Config) -> CommandResult<()> {
     }
 
     let core_config = app.get_core_config();
+    let download_manager = app.get_download_manager();
     if proxy_changed {
         manhuagui_client.reload_client(&core_config);
+        download_manager.reload_client(&core_config);
     } else {
         manhuagui_client.update_config(&core_config);
+        download_manager.update_config(&core_config);
     }
 
     if enable_file_logger_changed {
@@ -356,6 +359,7 @@ pub fn export_pdf_chapters(
 pub async fn update_downloaded_comics(app: AppHandle) -> CommandResult<()> {
     let config = app.get_config();
     let download_manager = app.get_download_manager();
+    let manhuagui_client = app.get_manhuagui_client();
 
     // 从下载目录中获取已下载的漫画
     let downloaded_comics = get_downloaded_comics(app.clone());
@@ -439,7 +443,18 @@ pub async fn update_downloaded_comics(app: AppHandle) -> CommandResult<()> {
             let chapter_id = chapter_info.chapter_id;
             let current = (i + 1) as i64;
 
-            let _ = download_manager.create_download_task(comic.clone(), chapter_id);
+            let pages = match manhuagui_client.get_img_urls(chapter_info).await {
+                Ok(pages) => pages,
+                Err(err) => {
+                    let err_title =
+                        format!("更新库存过程中，获取章节`{chapter_id}`的图片链接失败，已跳过");
+                    let message = err.to_message();
+                    tracing::error!(err_title, message);
+                    continue;
+                }
+            };
+
+            let _ = download_manager.create_download_task(comic.clone(), chapter_id, pages);
 
             let _ = UpdateDownloadedComicsEvent::CreateDownloadTaskProgress { comic_id, current }
                 .emit(&app);
@@ -500,11 +515,26 @@ pub fn show_path_in_file_manager(app: AppHandle, path: &str) -> CommandResult<()
         chapter_id = chapter_id
     )
 )]
-pub fn create_download_task(app: AppHandle, comic: Comic, chapter_id: i64) -> CommandResult<()> {
+pub async fn create_download_task(app: AppHandle, comic: Comic, chapter_id: i64) -> CommandResult<()> {
+    let chapter_info = comic
+        .groups
+        .values()
+        .flatten()
+        .find(|chapter_info| chapter_info.chapter_id == chapter_id)
+        .cloned()
+        .ok_or_else(|| eyre!("未找到章节ID对应的章节信息"))
+        .map_err(|err| CommandError::from("创建下载任务失败", err))?;
+
+    let pages = app
+        .get_manhuagui_client()
+        .get_img_urls(&chapter_info)
+        .await
+        .map_err(|err| CommandError::from("创建下载任务失败", err))?;
+
     let download_manager = app.get_download_manager();
 
     download_manager
-        .create_download_task(comic, chapter_id)
+        .create_download_task(comic, chapter_id, pages)
         .map_err(|err| CommandError::from("创建下载任务失败", err))?;
     tracing::debug!("下载任务创建成功");
     Ok(())

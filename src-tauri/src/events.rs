@@ -2,12 +2,14 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use tauri::AppHandle;
 use tauri_specta::Event;
 
-use crate::{
-    downloader::download_task_state::DownloadTaskState,
-    types::{ChapterInfo, Comic},
+use library::events::{
+    SleepingPayload, SpeedPayload, TaskCreatePayload, TaskDeletePayload, TaskUpdatePayload,
+    EVENT_SLEEPING, EVENT_SPEED, EVENT_TASK_CREATE, EVENT_TASK_DELETE, EVENT_TASK_UPDATE,
 };
+use source_api::{ChapterInfo, Comic, DownloadTaskState, EventObserver, LibraryEvent};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 #[serde(tag = "event", content = "data")]
@@ -138,4 +140,76 @@ pub enum UpdateDownloadedComicsEvent {
 #[serde(rename_all = "camelCase")]
 pub struct LogEvent {
     pub json_raw: String,
+}
+
+/// Bridges library [`LibraryEvent`]s to the desktop tauri_specta events the
+/// Vue frontend listens on. The event name is the `DownloadEvent` variant tag.
+pub struct CoreObserver(AppHandle);
+
+impl CoreObserver {
+    pub fn new(app: AppHandle) -> Self {
+        Self(app)
+    }
+}
+
+impl EventObserver for CoreObserver {
+    fn on_event(&self, event: &LibraryEvent) {
+        let app = &self.0;
+        match event.name {
+            EVENT_SPEED => {
+                if let Ok(payload) = serde_json::from_value::<SpeedPayload>(event.payload.clone()) {
+                    let _ = DownloadEvent::Speed { speed: payload.speed }.emit(app);
+                }
+            }
+            EVENT_SLEEPING => {
+                if let Ok(payload) =
+                    serde_json::from_value::<SleepingPayload>(event.payload.clone())
+                {
+                    let _ = DownloadEvent::Sleeping {
+                        chapter_id: payload.chapter_id,
+                        remaining_sec: payload.remaining_sec,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_TASK_CREATE => {
+                if let Ok(payload) =
+                    serde_json::from_value::<TaskCreatePayload>(event.payload.clone())
+                {
+                    let _ = DownloadEvent::TaskCreate {
+                        state: payload.state,
+                        comic: Box::new(payload.comic),
+                        chapter_info: Box::new(payload.chapter_info),
+                        downloaded_img_count: payload.downloaded_img_count,
+                        total_img_count: payload.total_img_count,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_TASK_DELETE => {
+                if let Ok(payload) =
+                    serde_json::from_value::<TaskDeletePayload>(event.payload.clone())
+                {
+                    let _ = DownloadEvent::TaskDelete {
+                        chapter_id: payload.chapter_id,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_TASK_UPDATE => {
+                if let Ok(payload) =
+                    serde_json::from_value::<TaskUpdatePayload>(event.payload.clone())
+                {
+                    let _ = DownloadEvent::TaskUpdate {
+                        state: payload.state,
+                        chapter_id: payload.chapter_id,
+                        downloaded_img_count: payload.downloaded_img_count,
+                        total_img_count: payload.total_img_count,
+                    }
+                    .emit(app);
+                }
+            }
+            _ => {}
+        }
+    }
 }

@@ -8,8 +8,6 @@ use std::{
 };
 
 use eyre::{eyre, OptionExt, WrapErr};
-use tauri::AppHandle;
-use tauri_specta::Event;
 use tokio::{
     sync::{watch, SemaphorePermit},
     task::JoinSet,
@@ -17,19 +15,21 @@ use tokio::{
 };
 use tracing::instrument;
 
+use source_api::{ChapterInfo, Comic, DownloadTaskState, LibraryEvent, PageRef};
+
 use crate::{
-    downloader::{download_img_task::DownloadImgTask, download_task_state::DownloadTaskState},
-    events::DownloadEvent,
-    extensions::{AppHandleExt, EyreReportToMessage},
-    types::{ChapterInfo, Comic},
+    downloader::{download_img_task::DownloadImgTask, DownloadDeps, EyreReportToMessage},
+    events::{
+        SleepingPayload, TaskCreatePayload, TaskDeletePayload, TaskUpdatePayload, EVENT_SLEEPING,
+        EVENT_TASK_CREATE, EVENT_TASK_DELETE, EVENT_TASK_UPDATE,
+    },
 };
-use source_api::PageRef;
-use source_manhuagui::ManhuaguiClient;
 
 pub struct DownloadTask {
-    pub app: AppHandle,
+    pub deps: DownloadDeps,
     pub comic: Arc<Comic>,
     pub chapter_info: Arc<ChapterInfo>,
+    pub pages: Vec<PageRef>,
     pub state_sender: watch::Sender<DownloadTaskState>,
     pub delete_sender: watch::Sender<()>,
     pub downloaded_img_count: Arc<AtomicU32>,
@@ -42,13 +42,18 @@ impl DownloadTask {
         skip_all,
         fields(comic_id = comic.id, comic_title = comic.title, chapter_id = chapter_id)
     )]
-    pub fn new(app: AppHandle, mut comic: Comic, chapter_id: i64) -> eyre::Result<Arc<Self>> {
-        comic.ensure_download_dir_fields(&app.get_core_config())?;
+    pub fn new(
+        deps: DownloadDeps,
+        mut comic: Comic,
+        chapter_id: i64,
+        pages: Vec<PageRef>,
+    ) -> eyre::Result<Arc<Self>> {
+        comic.ensure_download_dir_fields(&deps.config.read())?;
 
         let chapter_info = comic
             .groups
-            .iter()
-            .flat_map(|(_, chapter_infos)| chapter_infos.iter())
+            .values()
+            .flatten()
             .find(|chapter_info| chapter_info.chapter_id == chapter_id)
             .cloned()
             .ok_or_eyre("未找到章节ID对应的章节信息")?;
@@ -57,16 +62,17 @@ impl DownloadTask {
         let (delete_sender, _) = watch::channel(());
 
         let task = Arc::new(Self {
-            app,
+            deps,
             comic: Arc::new(comic),
             chapter_info: Arc::new(chapter_info),
+            pages,
             state_sender,
             delete_sender,
             downloaded_img_count: Arc::new(AtomicU32::new(0)),
             total_img_count: Arc::new(AtomicU32::new(0)),
         });
 
-        tauri::async_runtime::spawn(task.clone().process());
+        crate::downloader::spawn(task.clone().process());
 
         Ok(task)
     }
@@ -139,22 +145,18 @@ impl DownloadTask {
             return;
         }
 
-        let Some(img_urls) = self.get_img_urls().await else {
-            return;
-        };
-
         #[allow(clippy::cast_possible_truncation)]
         self.total_img_count
-            .store(img_urls.len() as u32, Ordering::Relaxed);
+            .store(self.pages.len() as u32, Ordering::Relaxed);
 
         let Some(temp_download_dir) = self.create_temp_download_dir() else {
             return;
         };
 
         let mut join_set = JoinSet::new();
-        for (i, page) in img_urls.into_iter().enumerate() {
+        for (i, page) in self.pages.clone().into_iter().enumerate() {
             let download_img_task =
-                DownloadImgTask::new(self.clone(), page.url, i, temp_download_dir.clone());
+                DownloadImgTask::new(self.clone(), page, i, temp_download_dir.clone());
             join_set.spawn(download_img_task.process());
         }
         join_set.join_all().await;
@@ -199,31 +201,6 @@ impl DownloadTask {
 
         self.set_state(DownloadTaskState::Completed);
         self.emit_download_task_update_event();
-    }
-
-    #[instrument(level = "error", skip_all)]
-    async fn get_img_urls(&self) -> Option<Vec<PageRef>> {
-        tracing::trace!("章节开始获取图片链接");
-
-        let img_urls = match self
-            .manhuagui_client()
-            .get_img_urls(&self.chapter_info)
-            .await
-        {
-            Ok(urls) => urls,
-            Err(err) => {
-                let err_title = "获取图片链接失败";
-                let message = err.to_message();
-                tracing::error!(err_title, message);
-
-                self.set_state(DownloadTaskState::Failed);
-                self.emit_download_task_update_event();
-
-                return None;
-            }
-        };
-
-        Some(img_urls)
     }
 
     #[instrument(level = "error", skip_all)]
@@ -289,9 +266,7 @@ impl DownloadTask {
         *permit = match permit.take() {
             Some(permit) => Some(permit),
             None => match self
-                .app
-                .get_download_manager()
-                .inner()
+                .deps
                 .chapter_sem
                 .acquire()
                 .await
@@ -354,7 +329,7 @@ impl DownloadTask {
     async fn handle_delete_receiver_change<'a>(&'a self, permit: &mut Option<SemaphorePermit<'a>>) {
         let chapter_id = self.chapter_info.chapter_id;
 
-        let _ = DownloadEvent::TaskDelete { chapter_id }.emit(&self.app);
+        self.emit_event(EVENT_TASK_DELETE, &TaskDeletePayload { chapter_id });
 
         if permit.is_some() {
             sleep(Duration::from_millis(100)).await;
@@ -366,13 +341,15 @@ impl DownloadTask {
     #[instrument(level = "error", skip_all)]
     async fn sleep_between_chapter(&self) {
         let chapter_id = self.chapter_info.chapter_id;
-        let mut remaining_sec = self.app.get_config().read().chapter_download_interval_sec;
+        let mut remaining_sec = self.deps.config.read().chapter_download_interval_sec;
         while remaining_sec > 0 {
-            let _ = DownloadEvent::Sleeping {
-                chapter_id,
-                remaining_sec,
-            }
-            .emit(&self.app);
+            self.emit_event(
+                EVENT_SLEEPING,
+                &SleepingPayload {
+                    chapter_id,
+                    remaining_sec,
+                },
+            );
             sleep(Duration::from_secs(1)).await;
             remaining_sec -= 1;
         }
@@ -398,27 +375,35 @@ impl DownloadTask {
     }
 
     pub fn emit_download_task_update_event(&self) {
-        let _ = DownloadEvent::TaskUpdate {
-            chapter_id: self.chapter_info.chapter_id,
-            state: *self.state_sender.borrow(),
-            downloaded_img_count: self.downloaded_img_count.load(Ordering::Relaxed),
-            total_img_count: self.total_img_count.load(Ordering::Relaxed),
-        }
-        .emit(&self.app);
+        self.emit_event(
+            EVENT_TASK_UPDATE,
+            &TaskUpdatePayload {
+                chapter_id: self.chapter_info.chapter_id,
+                state: *self.state_sender.borrow(),
+                downloaded_img_count: self.downloaded_img_count.load(Ordering::Relaxed),
+                total_img_count: self.total_img_count.load(Ordering::Relaxed),
+            },
+        );
     }
 
     fn emit_download_task_create_event(&self) {
-        let _ = DownloadEvent::TaskCreate {
-            state: *self.state_sender.borrow(),
-            comic: Box::new(self.comic.as_ref().clone()),
-            chapter_info: Box::new(self.chapter_info.as_ref().clone()),
-            downloaded_img_count: self.downloaded_img_count.load(Ordering::Relaxed),
-            total_img_count: self.total_img_count.load(Ordering::Relaxed),
-        }
-        .emit(&self.app);
+        self.emit_event(
+            EVENT_TASK_CREATE,
+            &TaskCreatePayload {
+                state: *self.state_sender.borrow(),
+                comic: self.comic.as_ref().clone(),
+                chapter_info: self.chapter_info.as_ref().clone(),
+                downloaded_img_count: self.downloaded_img_count.load(Ordering::Relaxed),
+                total_img_count: self.total_img_count.load(Ordering::Relaxed),
+            },
+        );
     }
 
-    fn manhuagui_client(&self) -> Arc<ManhuaguiClient> {
-        self.app.get_manhuagui_client().inner().clone()
+    fn emit_event(&self, name: &'static str, payload: &impl serde::Serialize) {
+        if let Ok(payload) = serde_json::to_value(payload) {
+            self.deps
+                .observer
+                .on_event(&LibraryEvent { name, payload });
+        }
     }
 }
