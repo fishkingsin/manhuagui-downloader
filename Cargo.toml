@@ -1,0 +1,33 @@
+[workspace]
+members = [
+    "src-tauri",
+    "core/source-api",
+    "core/source-manhuagui",
+    "core/library",
+]
+resolver = "2"
+
+[workspace.dependencies]
+async-trait = "0.1"
+bytes = { version = "1.8.0" }
+chrono = { version = "0.4.39" }
+eyre = { version = "0.6.12" }
+lz-str = { version = "0.2.1" }
+parking_lot = { version = "0.12.3", features = ["send_guard"] }
+regex = { version = "1.11.1" }
+reqwest = { version = "0.12.9", default-features = false }
+reqwest-middleware = { version = "0.4.0" }
+reqwest-retry = { version = "0.7.0" }
+scraper = { version = "0.22.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+specta = { version = "2.0.0-rc", features = ["serde_json"] }
+tokio = { version = "1.43.0", features = ["full"] }
+tracing = { version = "0.1.41" }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
+

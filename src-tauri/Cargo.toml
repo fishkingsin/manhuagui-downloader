@@ -22,32 +22,32 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1" }
+serde = { workspace = true }
+serde_json = { workspace = true }
 yaserde = { version = "0.11.2", features = ["yaserde_derive"] }
 
-specta = { version = "2.0.0-rc", features = ["serde_json"] }
+specta = { workspace = true }
 specta-util = { version = "0.0.7", features = ["export"] }
 tauri-specta = { version = "2.0.0-rc", features = ["derive", "typescript"] }
 specta-typescript = { version = "0.0.7" }
 
-reqwest = { version = "0.12.9", default-features = false }
-reqwest-retry = { version = "0.7.0" }
-reqwest-middleware = { version = "0.4.0" }
+reqwest = { workspace = true }
+reqwest-retry = { workspace = true }
+reqwest-middleware = { workspace = true }
 
-eyre = { version = "0.6.12" }
-parking_lot = { version = "0.12.3", features = ["send_guard"] }
-scraper = { version = "0.22.0" }
-lz-str = { version = "0.2.1" }
-regex = { version = "1.11.1" }
-tokio = { version = "1.43.0", features = ["full"] }
-bytes = { version = "1.8.0" }
+eyre = { workspace = true }
+parking_lot = { workspace = true }
+scraper = { workspace = true }
+lz-str = { workspace = true }
+regex = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
 zip = { version = "2.2.0", default-features = false }
 rayon = { version = "1.10.0" }
 uuid = { version = "1.11.0" }
 lopdf = { git = "https://github.com/lanyeeee/lopdf", features = ["embed_image_jpeg"] }
 image = { version = "0.25.2", default-features = false, features = ["jpeg"] }
-tracing = { version = "0.1.41" }
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["json", "time", "local-time"] }
 tracing-appender = { version = "0.2.3" }
 tracing-error = { version = "0.2.1" }
@@ -58,8 +58,3 @@ strfmt = { version = "0.2.5" }
 float-ord = { version = "0.3.2" }
 indexmap = { version = "2.11.0" }
 
-[profile.release]
-strip = true
-lto = true
-codegen-units = 1
-panic = "abort"
