@@ -5,36 +5,36 @@ use std::{
 
 use eyre::{eyre, OptionExt, WrapErr};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use tauri::AppHandle;
-use tauri_specta::Event;
+use serde::{Deserialize, Serialize};
 use tracing::instrument;
+use yaserde::YaSerialize;
 use zip::{write::SimpleFileOptions, ZipWriter};
 
-use crate::{
-    config::ExportSkipMode,
-    events::ExportCbzEvent,
-    export::{
-        get_downloaded_chapters, get_downloaded_chapters_by_ids, get_image_paths,
-        ComicExportLockGuard, ExportFormat,
-    },
-    extensions::AppHandleExt,
-    types::{Comic, ComicInfo},
+use source_api::{ChapterInfo, Comic, CoreConfig, EventObserver, ExportSkipMode};
+
+use super::{
+    emit_event, get_downloaded_chapters, get_downloaded_chapters_by_ids, get_image_paths,
+    ExportFormat,
+};
+use crate::events::{
+    ExportEndPayload, ExportErrorPayload, ExportProgressPayload, ExportStartPayload,
+    EVENT_CBZ_END, EVENT_CBZ_ERROR, EVENT_CBZ_PROGRESS, EVENT_CBZ_START,
 };
 
-struct CbzErrorEventGuard {
+struct CbzErrorEventGuard<'a> {
     uuid: String,
-    app: AppHandle,
+    observer: &'a dyn EventObserver,
     success: bool,
 }
 
-impl Drop for CbzErrorEventGuard {
+impl Drop for CbzErrorEventGuard<'_> {
     fn drop(&mut self) {
         if self.success {
             return;
         }
 
         let uuid = self.uuid.clone();
-        let _ = ExportCbzEvent::Error { uuid }.emit(&self.app);
+        emit_event(self.observer, EVENT_CBZ_ERROR, ExportErrorPayload { uuid });
     }
 }
 
@@ -45,26 +45,13 @@ impl Drop for CbzErrorEventGuard {
     skip_all,
     fields(comic_id = comic.id, comic_title = comic.title)
 )]
-pub fn cbz(app: &AppHandle, comic: &Comic) -> eyre::Result<()> {
-    let comic_id = comic.id;
-    let comic_title = &comic.title;
-    let export_lock = app.get_export_lock().inner().clone();
-
-    if !export_lock.try_acquire(comic_id) {
-        return Err(eyre!("漫画`{comic_title}`正在导出，请稍后再试"));
-    }
-
-    let _guard = ComicExportLockGuard {
-        lock: export_lock.clone(),
-        comic_id,
-    };
-
+pub fn cbz(config: &CoreConfig, observer: &dyn EventObserver, comic: &Comic) -> eyre::Result<()> {
     // 获取配置
-    let skip_mode = app.get_config().read().export_skip_mode;
+    let skip_mode = config.export_skip_mode;
     // 获取已下载章节
     let downloaded_chapters = get_downloaded_chapters(&comic.groups);
     // 调用内部实现
-    cbz_internal(app, comic, downloaded_chapters, skip_mode)
+    cbz_internal(config, observer, comic, downloaded_chapters, skip_mode)
 }
 
 #[allow(clippy::cast_possible_wrap)]
@@ -74,26 +61,17 @@ pub fn cbz(app: &AppHandle, comic: &Comic) -> eyre::Result<()> {
     skip_all,
     fields(comic_id = comic.id, comic_title = comic.title)
 )]
-pub fn cbz_chapters(app: &AppHandle, comic: &Comic, chapter_ids: Vec<i64>) -> eyre::Result<()> {
-    let comic_id = comic.id;
-    let comic_title = &comic.title;
-    let export_lock = app.get_export_lock().inner().clone();
-
-    // 检查导出锁
-    if !export_lock.try_acquire(comic_id) {
-        return Err(eyre!("漫画`{comic_title}`正在导出，请稍后再试"));
-    }
-
-    let _guard = ComicExportLockGuard {
-        lock: export_lock.clone(),
-        comic_id,
-    };
-
+pub fn cbz_chapters(
+    config: &CoreConfig,
+    observer: &dyn EventObserver,
+    comic: &Comic,
+    chapter_ids: Vec<i64>,
+) -> eyre::Result<()> {
     // 获取指定章节
     let downloaded_chapters = get_downloaded_chapters_by_ids(&comic.groups, &chapter_ids);
 
     // 调用内部实现(用户主动选择，所以不跳过)
-    cbz_internal(app, comic, downloaded_chapters, ExportSkipMode::None)
+    cbz_internal(config, observer, comic, downloaded_chapters, ExportSkipMode::None)
 }
 
 #[allow(clippy::cast_possible_wrap)]
@@ -101,9 +79,10 @@ pub fn cbz_chapters(app: &AppHandle, comic: &Comic, chapter_ids: Vec<i64>) -> ey
 #[allow(clippy::too_many_lines)]
 #[instrument(level = "error", skip_all, fields(skip_mode = ?skip_mode))]
 fn cbz_internal(
-    app: &AppHandle,
+    config: &CoreConfig,
+    observer: &dyn EventObserver,
     comic: &Comic,
-    downloaded_chapters: Vec<crate::types::ChapterInfo>,
+    downloaded_chapters: Vec<ChapterInfo>,
     skip_mode: ExportSkipMode,
 ) -> eyre::Result<()> {
     // 用于生成格式化的xml
@@ -114,17 +93,20 @@ fn cbz_internal(
     let event_uuid = uuid::Uuid::new_v4().to_string();
 
     // 发送开始导出cbz事件
-    let _ = ExportCbzEvent::Start {
-        uuid: event_uuid.clone(),
-        comic_title: comic.title.clone(),
-        total: downloaded_chapters.len() as u32,
-    }
-    .emit(app);
+    emit_event(
+        observer,
+        EVENT_CBZ_START,
+        ExportStartPayload {
+            uuid: event_uuid.clone(),
+            comic_title: comic.title.clone(),
+            total: downloaded_chapters.len() as u32,
+        },
+    );
 
     // 如果success为false，drop时发送Error事件
     let mut error_event_guard = CbzErrorEventGuard {
         uuid: event_uuid.clone(),
-        app: app.clone(),
+        observer,
         success: false,
     };
 
@@ -133,7 +115,7 @@ fn cbz_internal(
 
     let extension = ExportFormat::Cbz.extension();
     let comic_export_dir = comic
-        .get_comic_export_dir(&app.get_core_config())
+        .get_comic_export_dir(config)
         .wrap_err("获取导出目录失败")?;
     let cbz_export_dir = comic_export_dir.join(extension);
 
@@ -187,11 +169,14 @@ fn cbz_internal(
         if should_skip {
             // 更新进度
             let current = current.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-            let _ = ExportCbzEvent::Progress {
-                uuid: event_uuid.clone(),
-                current,
-            }
-            .emit(app);
+            emit_event(
+                observer,
+                EVENT_CBZ_PROGRESS,
+                ExportProgressPayload {
+                    uuid: event_uuid.clone(),
+                    current,
+                },
+            );
             return Ok(());
         }
 
@@ -248,23 +233,103 @@ fn cbz_internal(
         // 更新导出cbz的进度
         let current = current.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
         // 发送导出cbz进度事件
-        let _ = ExportCbzEvent::Progress {
-            uuid: event_uuid.clone(),
-            current,
-        }
-        .emit(app);
+        emit_event(
+            observer,
+            EVENT_CBZ_PROGRESS,
+            ExportProgressPayload {
+                uuid: event_uuid.clone(),
+                current,
+            },
+        );
 
         Ok(())
     })?;
 
     // 标记为成功，后面drop时就不会发送Error事件
     error_event_guard.success = true;
-    let _ = ExportCbzEvent::End {
-        uuid: event_uuid,
-        comic_id: comic.id,
-        chapter_export_dir: cbz_export_dir,
-    }
-    .emit(app);
+    emit_event(
+        observer,
+        EVENT_CBZ_END,
+        ExportEndPayload {
+            uuid: event_uuid,
+            comic_id: comic.id,
+            chapter_export_dir: cbz_export_dir,
+        },
+    );
 
     Ok(())
+}
+
+/// 主要参考了[Kavita的文档](https://wiki.kavitareader.com/guides/metadata/comics/)
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, YaSerialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComicInfo {
+    #[yaserde(rename = "Manga")]
+    pub manga: String,
+    /// 漫画名
+    #[yaserde(rename = "Series")]
+    pub series: String,
+    /// 出版社
+    #[yaserde(rename = "Publisher")]
+    pub publisher: String,
+    /// 作者
+    #[yaserde(rename = "Writer")]
+    pub writer: String,
+    /// 漫画类型
+    #[yaserde(rename = "Genre")]
+    pub genre: String,
+    #[yaserde(rename = "Summary")]
+    pub summary: String,
+    /// 章节名
+    #[yaserde(rename = "Title")]
+    pub title: String,
+    /// 普通章节序号
+    #[yaserde(rename = "Number")]
+    pub number: Option<String>,
+    /// 卷序号
+    #[yaserde(rename = "Volume")]
+    pub volume: Option<String>,
+    /// 如果值为Special，则该章节会被Kavita视为特刊
+    #[yaserde(rename = "Format")]
+    pub format: Option<String>,
+    /// 该章节的有多少页
+    #[yaserde(rename = "PageCount")]
+    pub page_count: i64,
+    /// 章节总数
+    /// - `0` => Ongoing
+    /// - `非零`且与`Number`或`Volume`一致 => Completed
+    /// - `其他非零值` => Ended
+    #[yaserde(rename = "Count")]
+    pub count: i64,
+}
+impl ComicInfo {
+    #[allow(clippy::cast_possible_wrap)]
+    pub fn from(comic: &Comic, chapter_info: &ChapterInfo) -> ComicInfo {
+        let order = Some(chapter_info.order.to_string());
+        let (number, volume, format) = match chapter_info.group_name.as_str() {
+            "单话" => (order, None, None),
+            "单行本" => (None, order, None),
+            _ => (order, None, Some("Special".to_string())),
+        };
+
+        let count = match chapter_info.comic_status.as_ref() {
+            "连载中" => 0,
+            _ => chapter_info.group_size,
+        };
+
+        ComicInfo {
+            manga: "Yes".to_string(),
+            series: chapter_info.comic_title.clone(),
+            publisher: "漫画柜".to_string(),
+            writer: comic.authors.join(", "),
+            genre: comic.genres.join(", "),
+            summary: comic.intro.clone(),
+            title: chapter_info.chapter_title.clone(),
+            number,
+            volume,
+            format,
+            page_count: chapter_info.chapter_size,
+            count,
+        }
+    }
 }

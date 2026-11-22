@@ -15,11 +15,12 @@ use tokio::time::sleep;
 use tracing::instrument;
 use walkdir::WalkDir;
 
+use library::export::{self, ComicExportLockGuard};
+
 use crate::{
     config::Config,
     errors::{CommandError, CommandResult},
-    events::UpdateDownloadedComicsEvent,
-    export,
+    events::{CoreObserver, UpdateDownloadedComicsEvent},
     extensions::{AppHandleExt, EyreReportToMessage, WalkDirEntryExt},
     logger,
     types::{
@@ -295,7 +296,23 @@ pub fn get_downloaded_comics(app: AppHandle) -> Vec<Comic> {
     fields(comic_id = comic.id, comic_title = comic.title)
 )]
 pub fn export_cbz(app: AppHandle, comic: Comic) -> CommandResult<()> {
-    export::cbz(&app, &comic).map_err(|err| CommandError::from("漫画导出cbz失败", err))?;
+    let comic_id = comic.id;
+    let comic_title = comic.title.clone();
+    let export_lock = app.get_export_lock().inner().clone();
+
+    if !export_lock.try_acquire(comic_id) {
+        return Err(CommandError::from(
+            "漫画导出cbz失败",
+            eyre!("漫画`{comic_title}`正在导出，请稍后再试"),
+        ));
+    }
+
+    let _guard = ComicExportLockGuard::new(export_lock.clone(), comic_id);
+    let core_config = app.get_core_config();
+    let observer = CoreObserver::new(app.clone());
+
+    export::cbz(&core_config, &observer, &comic)
+        .map_err(|err| CommandError::from("漫画导出cbz失败", err))?;
     tracing::debug!("漫画导出cbz成功");
     Ok(())
 }
@@ -309,7 +326,23 @@ pub fn export_cbz(app: AppHandle, comic: Comic) -> CommandResult<()> {
     fields(comic_id = comic.id, comic_title = comic.title)
 )]
 pub fn export_pdf(app: AppHandle, comic: Comic) -> CommandResult<()> {
-    export::pdf(&app, &comic).map_err(|err| CommandError::from("漫画导出pdf失败", err))?;
+    let comic_id = comic.id;
+    let comic_title = comic.title.clone();
+    let export_lock = app.get_export_lock().inner().clone();
+
+    if !export_lock.try_acquire(comic_id) {
+        return Err(CommandError::from(
+            "漫画导出pdf失败",
+            eyre!("漫画`{comic_title}`正在导出，请稍后再试"),
+        ));
+    }
+
+    let _guard = ComicExportLockGuard::new(export_lock.clone(), comic_id);
+    let core_config = app.get_core_config();
+    let observer = CoreObserver::new(app.clone());
+
+    export::pdf(&core_config, &observer, &comic)
+        .map_err(|err| CommandError::from("漫画导出pdf失败", err))?;
     tracing::debug!("漫画导出pdf成功");
     Ok(())
 }
@@ -327,7 +360,22 @@ pub fn export_cbz_chapters(
     comic: Comic,
     chapter_ids: Vec<i64>,
 ) -> CommandResult<()> {
-    export::cbz_chapters(&app, &comic, chapter_ids)
+    let comic_id = comic.id;
+    let comic_title = comic.title.clone();
+    let export_lock = app.get_export_lock().inner().clone();
+
+    if !export_lock.try_acquire(comic_id) {
+        return Err(CommandError::from(
+            "漫画导出指定章节cbz失败",
+            eyre!("漫画`{comic_title}`正在导出，请稍后再试"),
+        ));
+    }
+
+    let _guard = ComicExportLockGuard::new(export_lock.clone(), comic_id);
+    let core_config = app.get_core_config();
+    let observer = CoreObserver::new(app.clone());
+
+    export::cbz_chapters(&core_config, &observer, &comic, chapter_ids)
         .map_err(|err| CommandError::from("漫画导出指定章节cbz失败", err))?;
     tracing::debug!("漫画导出指定章节cbz成功");
     Ok(())
@@ -346,7 +394,22 @@ pub fn export_pdf_chapters(
     comic: Comic,
     chapter_ids: Vec<i64>,
 ) -> CommandResult<()> {
-    export::pdf_chapters(&app, &comic, chapter_ids)
+    let comic_id = comic.id;
+    let comic_title = comic.title.clone();
+    let export_lock = app.get_export_lock().inner().clone();
+
+    if !export_lock.try_acquire(comic_id) {
+        return Err(CommandError::from(
+            "漫画导出指定章节pdf失败",
+            eyre!("漫画`{comic_title}`正在导出，请稍后再试"),
+        ));
+    }
+
+    let _guard = ComicExportLockGuard::new(export_lock.clone(), comic_id);
+    let core_config = app.get_core_config();
+    let observer = CoreObserver::new(app.clone());
+
+    export::pdf_chapters(&core_config, &observer, &comic, chapter_ids)
         .map_err(|err| CommandError::from("漫画导出指定章节pdf失败", err))?;
     tracing::debug!("漫画导出指定章节pdf成功");
     Ok(())

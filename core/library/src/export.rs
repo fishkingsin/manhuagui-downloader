@@ -13,7 +13,7 @@ use parking_lot::Mutex;
 pub use pdf::{pdf, pdf_chapters};
 use tracing::instrument;
 
-use crate::{extensions::PathIsImg, types::ChapterInfo};
+use source_api::{ChapterInfo, EventObserver, LibraryEvent};
 
 /// 导出互斥锁管理器，确保同一漫画的导出操作串行执行
 #[derive(Debug, Clone, Default)]
@@ -45,14 +45,33 @@ impl ComicExportLock {
     }
 }
 
-struct ComicExportLockGuard {
+/// RAII guard that releases a [`ComicExportLock`] on drop. The shell acquires
+/// the lock around a library export call and holds this guard for its duration.
+pub struct ComicExportLockGuard {
     lock: ComicExportLock,
     comic_id: i64,
+}
+
+impl ComicExportLockGuard {
+    pub fn new(lock: ComicExportLock, comic_id: i64) -> Self {
+        Self { lock, comic_id }
+    }
 }
 
 impl Drop for ComicExportLockGuard {
     fn drop(&mut self) {
         self.lock.release(self.comic_id);
+    }
+}
+
+/// Emits a serialized payload as a [`LibraryEvent`] on the observer.
+pub(crate) fn emit_event(
+    observer: &dyn EventObserver,
+    name: &'static str,
+    payload: impl serde::Serialize,
+) {
+    if let Ok(payload) = serde_json::to_value(payload) {
+        observer.on_event(&LibraryEvent { name, payload });
     }
 }
 
@@ -67,6 +86,20 @@ impl ExportFormat {
             ExportFormat::Pdf => "pdf",
             ExportFormat::Cbz => "cbz",
         }
+    }
+}
+
+trait PathIsImg {
+    /// 判断路径是否为图片文件
+    fn is_img(&self) -> bool;
+}
+
+impl PathIsImg for Path {
+    fn is_img(&self) -> bool {
+        self.extension()
+            .and_then(|ext| ext.to_str())
+            .map(str::to_lowercase)
+            .is_some_and(|ext| matches!(ext.as_str(), "jpg"))
     }
 }
 

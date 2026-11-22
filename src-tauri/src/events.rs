@@ -6,8 +6,12 @@ use tauri::AppHandle;
 use tauri_specta::Event;
 
 use library::events::{
+    ExportEndPayload, ExportErrorPayload, ExportProgressPayload, ExportStartPayload,
     SleepingPayload, SpeedPayload, TaskCreatePayload, TaskDeletePayload, TaskUpdatePayload,
-    EVENT_SLEEPING, EVENT_SPEED, EVENT_TASK_CREATE, EVENT_TASK_DELETE, EVENT_TASK_UPDATE,
+    EVENT_CBZ_END, EVENT_CBZ_ERROR, EVENT_CBZ_PROGRESS, EVENT_CBZ_START, EVENT_PDF_CREATE_END,
+    EVENT_PDF_CREATE_ERROR, EVENT_PDF_CREATE_PROGRESS, EVENT_PDF_CREATE_START, EVENT_PDF_MERGE_END,
+    EVENT_PDF_MERGE_ERROR, EVENT_PDF_MERGE_PROGRESS, EVENT_PDF_MERGE_START, EVENT_SLEEPING,
+    EVENT_SPEED, EVENT_TASK_CREATE, EVENT_TASK_DELETE, EVENT_TASK_UPDATE,
 };
 use source_api::{ChapterInfo, Comic, DownloadTaskState, EventObserver, LibraryEvent};
 
@@ -205,6 +209,132 @@ impl EventObserver for CoreObserver {
                         chapter_id: payload.chapter_id,
                         downloaded_img_count: payload.downloaded_img_count,
                         total_img_count: payload.total_img_count,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_CBZ_START => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportStartPayload>(event.payload.clone())
+                {
+                    let _ = ExportCbzEvent::Start {
+                        uuid: payload.uuid,
+                        comic_title: payload.comic_title,
+                        total: payload.total,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_CBZ_PROGRESS => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportProgressPayload>(event.payload.clone())
+                {
+                    let _ = ExportCbzEvent::Progress {
+                        uuid: payload.uuid,
+                        current: payload.current,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_CBZ_ERROR => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportErrorPayload>(event.payload.clone())
+                {
+                    let _ = ExportCbzEvent::Error { uuid: payload.uuid }.emit(app);
+                }
+            }
+            EVENT_CBZ_END => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportEndPayload>(event.payload.clone())
+                {
+                    let _ = ExportCbzEvent::End {
+                        uuid: payload.uuid,
+                        comic_id: payload.comic_id,
+                        chapter_export_dir: payload.chapter_export_dir,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_PDF_CREATE_START => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportStartPayload>(event.payload.clone())
+                {
+                    let _ = ExportPdfEvent::CreateStart {
+                        uuid: payload.uuid,
+                        comic_title: payload.comic_title,
+                        total: payload.total,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_PDF_CREATE_PROGRESS => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportProgressPayload>(event.payload.clone())
+                {
+                    let _ = ExportPdfEvent::CreateProgress {
+                        uuid: payload.uuid,
+                        current: payload.current,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_PDF_CREATE_ERROR => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportErrorPayload>(event.payload.clone())
+                {
+                    let _ = ExportPdfEvent::CreateError { uuid: payload.uuid }.emit(app);
+                }
+            }
+            EVENT_PDF_CREATE_END => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportEndPayload>(event.payload.clone())
+                {
+                    let _ = ExportPdfEvent::CreateEnd {
+                        uuid: payload.uuid,
+                        comic_id: payload.comic_id,
+                        chapter_export_dir: payload.chapter_export_dir,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_PDF_MERGE_START => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportStartPayload>(event.payload.clone())
+                {
+                    let _ = ExportPdfEvent::MergeStart {
+                        uuid: payload.uuid,
+                        comic_title: payload.comic_title,
+                        total: payload.total,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_PDF_MERGE_PROGRESS => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportProgressPayload>(event.payload.clone())
+                {
+                    let _ = ExportPdfEvent::MergeProgress {
+                        uuid: payload.uuid,
+                        current: payload.current,
+                    }
+                    .emit(app);
+                }
+            }
+            EVENT_PDF_MERGE_ERROR => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportErrorPayload>(event.payload.clone())
+                {
+                    let _ = ExportPdfEvent::MergeError { uuid: payload.uuid }.emit(app);
+                }
+            }
+            EVENT_PDF_MERGE_END => {
+                if let Ok(payload) =
+                    serde_json::from_value::<ExportEndPayload>(event.payload.clone())
+                {
+                    let _ = ExportPdfEvent::MergeEnd {
+                        uuid: payload.uuid,
+                        comic_id: payload.comic_id,
+                        chapter_export_dir: payload.chapter_export_dir,
                     }
                     .emit(app);
                 }

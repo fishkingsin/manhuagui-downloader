@@ -7,8 +7,9 @@ use source_manhuagui::ManhuaguiClient;
 use tauri::{Manager, State};
 
 use library::downloader::download_manager::DownloadManager;
+use library::export::ComicExportLock;
 
-use crate::{config::Config, export::ComicExportLock};
+use crate::config::Config;
 
 pub trait EyreReportToMessage {
     fn to_message(&self) -> String;
@@ -84,19 +85,5 @@ impl WalkDirEntryExt for walkdir::DirEntry {
         }
 
         true
-    }
-}
-
-pub trait PathIsImg {
-    /// 判断路径是否为图片文件
-    fn is_img(&self) -> bool;
-}
-
-impl PathIsImg for std::path::Path {
-    fn is_img(&self) -> bool {
-        self.extension()
-            .and_then(|ext| ext.to_str())
-            .map(str::to_lowercase)
-            .is_some_and(|ext| matches!(ext.as_str(), "jpg"))
     }
 }

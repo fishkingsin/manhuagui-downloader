@@ -8,10 +8,15 @@
 //! on in `ProgressesPane.vue`), and the *data* is the inner camelCase payload.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use library::events::{
+    ExportEndPayload, ExportErrorPayload, ExportProgressPayload, ExportStartPayload,
     SleepingPayload, SpeedPayload, TaskCreatePayload, TaskDeletePayload, TaskUpdatePayload,
-    EVENT_SLEEPING, EVENT_SPEED, EVENT_TASK_CREATE, EVENT_TASK_DELETE, EVENT_TASK_UPDATE,
+    EVENT_CBZ_END, EVENT_CBZ_ERROR, EVENT_CBZ_PROGRESS, EVENT_CBZ_START, EVENT_PDF_CREATE_END,
+    EVENT_PDF_CREATE_ERROR, EVENT_PDF_CREATE_PROGRESS, EVENT_PDF_CREATE_START, EVENT_PDF_MERGE_END,
+    EVENT_PDF_MERGE_ERROR, EVENT_PDF_MERGE_PROGRESS, EVENT_PDF_MERGE_START, EVENT_SLEEPING,
+    EVENT_SPEED, EVENT_TASK_CREATE, EVENT_TASK_DELETE, EVENT_TASK_UPDATE,
 };
 use source_api::{ChapterInfo, Comic, DownloadTaskState, LibraryEvent};
 
@@ -145,5 +150,115 @@ fn task_update_event_matches_desktop_golden() {
             total_img_count: 10,
         },
         TASK_UPDATE_GOLDEN,
+    );
+}
+
+// ---- export event golden fixtures (ExportCbzEvent / ExportPdfEvent) ----
+
+#[test]
+fn export_events_match_desktop_golden() {
+    // CBZ events (tags: Start/Progress/Error/End) and PDF events (tags:
+    // Create*/Merge*) are already disjoint, so the plain variant tag is the
+    // event name — identical to the serde tag the desktop enums emit.
+    assert_event_matches(
+        EVENT_CBZ_START,
+        ExportStartPayload {
+            uuid: "start-uuid".into(),
+            comic_title: "测试漫画".into(),
+            total: 3,
+        },
+        r#"{"event":"Start","data":{"uuid":"start-uuid","comicTitle":"测试漫画","total":3}}"#,
+    );
+    assert_event_matches(
+        EVENT_CBZ_PROGRESS,
+        ExportProgressPayload {
+            uuid: "progress-uuid".into(),
+            current: 2,
+        },
+        r#"{"event":"Progress","data":{"uuid":"progress-uuid","current":2}}"#,
+    );
+    assert_event_matches(
+        EVENT_CBZ_ERROR,
+        ExportErrorPayload {
+            uuid: "error-uuid".into(),
+        },
+        r#"{"event":"Error","data":{"uuid":"error-uuid"}}"#,
+    );
+    assert_event_matches(
+        EVENT_CBZ_END,
+        ExportEndPayload {
+            uuid: "end-uuid".into(),
+            comic_id: 1,
+            chapter_export_dir: PathBuf::from("/tmp/export"),
+        },
+        r#"{"event":"End","data":{"uuid":"end-uuid","comicId":1,"chapterExportDir":"/tmp/export"}}"#,
+    );
+
+    assert_event_matches(
+        EVENT_PDF_CREATE_START,
+        ExportStartPayload {
+            uuid: "start-uuid".into(),
+            comic_title: "测试漫画".into(),
+            total: 3,
+        },
+        r#"{"event":"CreateStart","data":{"uuid":"start-uuid","comicTitle":"测试漫画","total":3}}"#,
+    );
+    assert_event_matches(
+        EVENT_PDF_CREATE_PROGRESS,
+        ExportProgressPayload {
+            uuid: "progress-uuid".into(),
+            current: 2,
+        },
+        r#"{"event":"CreateProgress","data":{"uuid":"progress-uuid","current":2}}"#,
+    );
+    assert_event_matches(
+        EVENT_PDF_CREATE_ERROR,
+        ExportErrorPayload {
+            uuid: "error-uuid".into(),
+        },
+        r#"{"event":"CreateError","data":{"uuid":"error-uuid"}}"#,
+    );
+    assert_event_matches(
+        EVENT_PDF_CREATE_END,
+        ExportEndPayload {
+            uuid: "end-uuid".into(),
+            comic_id: 1,
+            chapter_export_dir: PathBuf::from("/tmp/export"),
+        },
+        r#"{"event":"CreateEnd","data":{"uuid":"end-uuid","comicId":1,"chapterExportDir":"/tmp/export"}}"#,
+    );
+
+    assert_event_matches(
+        EVENT_PDF_MERGE_START,
+        ExportStartPayload {
+            uuid: "start-uuid".into(),
+            comic_title: "测试漫画".into(),
+            total: 3,
+        },
+        r#"{"event":"MergeStart","data":{"uuid":"start-uuid","comicTitle":"测试漫画","total":3}}"#,
+    );
+    assert_event_matches(
+        EVENT_PDF_MERGE_PROGRESS,
+        ExportProgressPayload {
+            uuid: "progress-uuid".into(),
+            current: 2,
+        },
+        r#"{"event":"MergeProgress","data":{"uuid":"progress-uuid","current":2}}"#,
+    );
+    assert_event_matches(
+        EVENT_PDF_MERGE_ERROR,
+        ExportErrorPayload {
+            uuid: "error-uuid".into(),
+        },
+        r#"{"event":"MergeError","data":{"uuid":"error-uuid"}}"#,
+    );
+    assert_event_matches(
+        EVENT_PDF_MERGE_END,
+        ExportEndPayload {
+            uuid: "end-uuid".into(),
+            comic_id: 1,
+            chapter_export_dir: PathBuf::from("/tmp/export"),
+        },
+        r#"{"event":"MergeEnd","data":{"uuid":"end-uuid","comicId":1,"chapterExportDir":"/tmp/export"}}"#,
     );
 }

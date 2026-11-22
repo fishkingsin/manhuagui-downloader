@@ -1,65 +1,64 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    io::Read,
+    io::{Cursor, Read},
     path::{Path, PathBuf},
     sync::{atomic::AtomicU32, Arc},
 };
 
-use eyre::{eyre, OptionExt, WrapErr};
+use eyre::{OptionExt, WrapErr};
 use float_ord::FloatOrd;
+use image::ImageReader;
 use lopdf::{
     content::{Content, Operation},
     dictionary, Bookmark, Document, Object, Stream,
 };
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use tauri::AppHandle;
-use tauri_specta::Event;
 use tracing::instrument;
 
-use crate::{
-    config::ExportSkipMode,
-    events::ExportPdfEvent,
-    export::{
-        get_downloaded_chapters, get_downloaded_chapters_by_ids, get_image_paths,
-        ComicExportLockGuard, ExportFormat,
-    },
-    extensions::AppHandleExt,
-    types::{ChapterInfo, Comic},
-    utils,
+use source_api::{ChapterInfo, Comic, CoreConfig, EventObserver, ExportSkipMode};
+
+use super::{
+    emit_event, get_downloaded_chapters, get_downloaded_chapters_by_ids, get_image_paths,
+    ExportFormat,
+};
+use crate::events::{
+    ExportEndPayload, ExportErrorPayload, ExportProgressPayload, ExportStartPayload,
+    EVENT_PDF_CREATE_END, EVENT_PDF_CREATE_ERROR, EVENT_PDF_CREATE_PROGRESS, EVENT_PDF_CREATE_START,
+    EVENT_PDF_MERGE_END, EVENT_PDF_MERGE_ERROR, EVENT_PDF_MERGE_PROGRESS, EVENT_PDF_MERGE_START,
 };
 
-struct PdfCreateErrorEventGuard {
+struct PdfCreateErrorEventGuard<'a> {
     uuid: String,
-    app: AppHandle,
+    observer: &'a dyn EventObserver,
     success: bool,
 }
 
-impl Drop for PdfCreateErrorEventGuard {
+impl Drop for PdfCreateErrorEventGuard<'_> {
     fn drop(&mut self) {
         if self.success {
             return;
         }
 
         let uuid = self.uuid.clone();
-        let _ = ExportPdfEvent::CreateError { uuid }.emit(&self.app);
+        emit_event(self.observer, EVENT_PDF_CREATE_ERROR, ExportErrorPayload { uuid });
     }
 }
 
-struct PdfMergeErrorEventGuard {
+struct PdfMergeErrorEventGuard<'a> {
     uuid: String,
-    app: AppHandle,
+    observer: &'a dyn EventObserver,
     success: bool,
 }
 
-impl Drop for PdfMergeErrorEventGuard {
+impl Drop for PdfMergeErrorEventGuard<'_> {
     fn drop(&mut self) {
         if self.success {
             return;
         }
 
         let uuid = self.uuid.clone();
-        let _ = ExportPdfEvent::MergeError { uuid }.emit(&self.app);
+        emit_event(self.observer, EVENT_PDF_MERGE_ERROR, ExportErrorPayload { uuid });
     }
 }
 
@@ -70,34 +69,17 @@ impl Drop for PdfMergeErrorEventGuard {
     skip_all,
     fields(comic_id = comic.id, comic_title = comic.title)
 )]
-pub fn pdf(app: &AppHandle, comic: &Comic) -> eyre::Result<()> {
-    let comic_id = comic.id;
-    let comic_title = &comic.title;
-    let export_lock = app.get_export_lock().inner().clone();
-
-    // 检查导出锁
-    if !export_lock.try_acquire(comic_id) {
-        return Err(eyre!("漫画`{comic_title}`正在导出，请稍后再试"));
-    }
-
-    let _guard = ComicExportLockGuard {
-        lock: export_lock.clone(),
-        comic_id,
-    };
-
+pub fn pdf(config: &CoreConfig, observer: &dyn EventObserver, comic: &Comic) -> eyre::Result<()> {
     // 获取配置
-    let config = app.get_config();
-    let config_guard = config.read();
-    let skip_mode = config_guard.export_skip_mode;
-    let enable_merge_pdf = config_guard.enable_merge_pdf;
+    let skip_mode = config.export_skip_mode;
+    let enable_merge_pdf = config.enable_merge_pdf;
     let enable_merge = !matches!(skip_mode, ExportSkipMode::SkipExported) && enable_merge_pdf;
-    drop(config_guard);
 
     // 获取已下载章节
     let downloaded_chapters = get_downloaded_chapters(&comic.groups);
 
     // 调用内部实现
-    pdf_internal(app, comic, downloaded_chapters, skip_mode, enable_merge)
+    pdf_internal(config, observer, comic, downloaded_chapters, skip_mode, enable_merge)
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -107,33 +89,25 @@ pub fn pdf(app: &AppHandle, comic: &Comic) -> eyre::Result<()> {
     skip_all,
     fields(comic_id = comic.id, comic_title = comic.title)
 )]
-pub fn pdf_chapters(app: &AppHandle, comic: &Comic, chapter_ids: Vec<i64>) -> eyre::Result<()> {
-    let comic_id = comic.id;
-    let comic_title = &comic.title;
-    let export_lock = app.get_export_lock().inner().clone();
-
-    // 检查导出锁
-    if !export_lock.try_acquire(comic_id) {
-        return Err(eyre!("漫画`{comic_title}`正在导出，请稍后再试"));
-    }
-
-    let _guard = ComicExportLockGuard {
-        lock: export_lock.clone(),
-        comic_id,
-    };
-
+pub fn pdf_chapters(
+    config: &CoreConfig,
+    observer: &dyn EventObserver,
+    comic: &Comic,
+    chapter_ids: Vec<i64>,
+) -> eyre::Result<()> {
     // 获取指定章节
     let downloaded_chapters = get_downloaded_chapters_by_ids(&comic.groups, &chapter_ids);
 
     // 调用内部实现(用户主动选择，不跳过，不合并)
-    pdf_internal(app, comic, downloaded_chapters, ExportSkipMode::None, false)
+    pdf_internal(config, observer, comic, downloaded_chapters, ExportSkipMode::None, false)
 }
 
 #[allow(clippy::cast_possible_truncation)]
 #[allow(clippy::too_many_lines)]
 #[instrument(level = "error", skip_all, fields(skip_mode = ?skip_mode))]
 fn pdf_internal(
-    app: &AppHandle,
+    config: &CoreConfig,
+    observer: &dyn EventObserver,
     comic: &Comic,
     downloaded_chapters: Vec<ChapterInfo>,
     skip_mode: ExportSkipMode,
@@ -141,16 +115,19 @@ fn pdf_internal(
 ) -> eyre::Result<()> {
     let create_event_uuid = uuid::Uuid::new_v4().to_string();
     // 发送开始创建pdf事件
-    let _ = ExportPdfEvent::CreateStart {
-        uuid: create_event_uuid.clone(),
-        comic_title: comic.title.clone(),
-        total: downloaded_chapters.len() as u32,
-    }
-    .emit(app);
+    emit_event(
+        observer,
+        EVENT_PDF_CREATE_START,
+        ExportStartPayload {
+            uuid: create_event_uuid.clone(),
+            comic_title: comic.title.clone(),
+            total: downloaded_chapters.len() as u32,
+        },
+    );
     // 如果success为false，drop时发送CreateError事件
     let mut create_error_event_guard = PdfCreateErrorEventGuard {
         uuid: create_event_uuid.clone(),
-        app: app.clone(),
+        observer,
         success: false,
     };
     // 用来记录创建pdf的进度
@@ -158,7 +135,7 @@ fn pdf_internal(
 
     let extension = ExportFormat::Pdf.extension();
     let comic_export_dir = comic
-        .get_comic_export_dir(&app.get_core_config())
+        .get_comic_export_dir(config)
         .wrap_err("获取导出目录失败")?;
 
     // 章节和它们对应的pdf路径(用于合并)
@@ -167,7 +144,7 @@ fn pdf_internal(
 
     // 并发处理
     let current_span = tracing::Span::current();
-    let create_pdf_concurrency = app.get_config().read().create_pdf_concurrency;
+    let create_pdf_concurrency = config.create_pdf_concurrency;
     let thread_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(create_pdf_concurrency)
         .build()
@@ -231,11 +208,14 @@ fn pdf_internal(
                     // 更新进度
                     let current =
                         created_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-                    let _ = ExportPdfEvent::CreateProgress {
-                        uuid: create_event_uuid.clone(),
-                        current,
-                    }
-                    .emit(app);
+                    emit_event(
+                        observer,
+                        EVENT_PDF_CREATE_PROGRESS,
+                        ExportProgressPayload {
+                            uuid: create_event_uuid.clone(),
+                            current,
+                        },
+                    );
                     return Ok(());
                 }
 
@@ -258,11 +238,14 @@ fn pdf_internal(
                 // 更新创建pdf的进度
                 let current = created_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                 // 发送创建pdf进度事件
-                let _ = ExportPdfEvent::CreateProgress {
-                    uuid: create_event_uuid.clone(),
-                    current,
-                }
-                .emit(app);
+                emit_event(
+                    observer,
+                    EVENT_PDF_CREATE_PROGRESS,
+                    ExportProgressPayload {
+                        uuid: create_event_uuid.clone(),
+                        current,
+                    },
+                );
 
                 Ok(())
             })
@@ -272,18 +255,21 @@ fn pdf_internal(
     create_error_event_guard.success = true;
 
     // 发送创建pdf完成事件
-    let _ = ExportPdfEvent::CreateEnd {
-        uuid: create_event_uuid,
-        comic_id: comic.id,
-        chapter_export_dir: pdf_export_dir.clone(),
-    }
-    .emit(app);
+    emit_event(
+        observer,
+        EVENT_PDF_CREATE_END,
+        ExportEndPayload {
+            uuid: create_event_uuid,
+            comic_id: comic.id,
+            chapter_export_dir: pdf_export_dir.clone(),
+        },
+    );
 
     // 合并PDF
     if enable_merge {
         let chapter_and_pdf_path_pairs = std::mem::take(&mut *chapter_and_pdf_path_pairs.lock());
         merge_pdf_files(
-            app,
+            observer,
             comic.id,
             &comic.title,
             &pdf_export_dir,
@@ -297,7 +283,7 @@ fn pdf_internal(
 #[allow(clippy::cast_possible_truncation)]
 #[instrument(level = "error", skip_all)]
 fn merge_pdf_files(
-    app: &AppHandle,
+    observer: &dyn EventObserver,
     comic_id: i64,
     comic_title: &str,
     pdf_export_dir: &Path,
@@ -325,16 +311,19 @@ fn merge_pdf_files(
 
     let merge_event_uuid = uuid::Uuid::new_v4().to_string();
     // 发送开始合并pdf事件
-    let _ = ExportPdfEvent::MergeStart {
-        uuid: merge_event_uuid.clone(),
-        comic_title: comic_title.to_string(),
-        total: chapter_export_dir_to_pdf_paths.len() as u32,
-    }
-    .emit(app);
+    emit_event(
+        observer,
+        EVENT_PDF_MERGE_START,
+        ExportStartPayload {
+            uuid: merge_event_uuid.clone(),
+            comic_title: comic_title.to_string(),
+            total: chapter_export_dir_to_pdf_paths.len() as u32,
+        },
+    );
     // 如果success为false，drop时发送MergeError事件
     let mut merge_error_event_guard = PdfMergeErrorEventGuard {
         uuid: merge_event_uuid.clone(),
-        app: app.clone(),
+        observer,
         success: false,
     };
 
@@ -357,21 +346,27 @@ fn merge_pdf_files(
         // 合并pdf
         merge_pdf_file(chapter_pdf_paths, &pdf_path).wrap_err("合并pdf失败")?;
         // 发送合并pdf进度事件
-        let _ = ExportPdfEvent::MergeProgress {
-            uuid: merge_event_uuid.clone(),
-            current: (i + 1) as u32,
-        }
-        .emit(app);
+        emit_event(
+            observer,
+            EVENT_PDF_MERGE_PROGRESS,
+            ExportProgressPayload {
+                uuid: merge_event_uuid.clone(),
+                current: (i + 1) as u32,
+            },
+        );
     }
     // 标记为成功，后面drop时就不会发送MergeError事件
     merge_error_event_guard.success = true;
     // 发送合并pdf完成事件
-    let _ = ExportPdfEvent::MergeEnd {
-        uuid: merge_event_uuid,
-        comic_id,
-        chapter_export_dir: pdf_export_dir.to_path_buf(),
-    }
-    .emit(app);
+    emit_event(
+        observer,
+        EVENT_PDF_MERGE_END,
+        ExportEndPayload {
+            uuid: merge_event_uuid,
+            comic_id,
+            chapter_export_dir: pdf_export_dir.to_path_buf(),
+        },
+    );
 
     Ok(())
 }
@@ -392,7 +387,7 @@ fn create_pdf(image_paths: Vec<PathBuf>, pdf_path: &Path) -> eyre::Result<()> {
 
         let buffer = read_image_to_buffer(&image_path)
             .wrap_err(format!("将`{}`读取到buffer失败", image_path.display()))?;
-        let (width, height) = utils::get_dimensions(&buffer)
+        let (width, height) = get_dimensions(&buffer)
             .wrap_err(format!("获取`{}`的尺寸失败", image_path.display()))?;
         let image_stream = lopdf::xobject::image_from(buffer)
             .wrap_err(format!("创建`{}`的图片流失败", image_path.display()))?;
@@ -464,6 +459,13 @@ fn read_image_to_buffer(image_path: &Path) -> eyre::Result<Vec<u8>> {
         .read_to_end(&mut buffer)
         .wrap_err(format!("读取`{}`失败", image_path.display()))?;
     Ok(buffer)
+}
+
+#[instrument(level = "error", skip_all)]
+fn get_dimensions(img_data: &[u8]) -> eyre::Result<(u32, u32)> {
+    let reader = ImageReader::new(Cursor::new(img_data)).with_guessed_format()?;
+    let dimensions = reader.into_dimensions()?;
+    Ok(dimensions)
 }
 
 /// 将`chapter_pdf_paths`中的PDF合并到`pdf_path`中

@@ -2,7 +2,6 @@ mod commands;
 mod config;
 mod errors;
 mod events;
-mod export;
 mod extensions;
 mod logger;
 mod types;
@@ -13,6 +12,7 @@ use std::sync::Arc;
 use config::Config;
 use eyre::WrapErr;
 use library::downloader::download_manager::DownloadManager;
+use library::export::ComicExportLock;
 use parking_lot::RwLock;
 use source_manhuagui::ManhuaguiClient;
 use tauri::{Manager, Wry};
@@ -24,7 +24,6 @@ use crate::{
         CoreObserver, DownloadEvent, ExportCbzEvent, ExportPdfEvent, LogEvent,
         UpdateDownloadedComicsEvent,
     },
-    export::ComicExportLock,
 };
 
 fn generate_context() -> tauri::Context<Wry> {

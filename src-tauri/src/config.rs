@@ -173,3 +173,71 @@ impl From<&Config> for source_api::CoreConfig {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn filled_config() -> Config {
+        Config {
+            cookie: "session-cookie".to_string(),
+            download_dir: PathBuf::from("/data/downloads"),
+            export_dir: PathBuf::from("/data/exports"),
+            enable_file_logger: false,
+            chapter_concurrency: 7,
+            chapter_download_interval_sec: 11,
+            img_concurrency: 13,
+            img_download_interval_sec: 17,
+            update_get_comic_interval_sec: 19,
+            proxy_mode: ProxyMode::Custom,
+            proxy_host: "proxy.example.com".to_string(),
+            proxy_port: 3128,
+            comic_dir_fmt: "{comic_title} - {author}".to_string(),
+            chapter_dir_fmt: "{order} {chapter_title}".to_string(),
+            create_pdf_concurrency: 23,
+            enable_merge_pdf: false,
+            export_skip_mode: ExportSkipMode::SkipExisting,
+        }
+    }
+
+    #[test]
+    fn from_config_maps_every_field_to_core_config() {
+        let config = filled_config();
+        let core: source_api::CoreConfig = (&config).into();
+
+        assert_eq!(core.cookie, config.cookie);
+        assert_eq!(core.download_dir, config.download_dir);
+        assert_eq!(core.export_dir, config.export_dir);
+        assert_eq!(core.chapter_concurrency, config.chapter_concurrency);
+        assert_eq!(
+            core.chapter_download_interval_sec,
+            config.chapter_download_interval_sec
+        );
+        assert_eq!(core.img_concurrency, config.img_concurrency);
+        assert_eq!(
+            core.img_download_interval_sec,
+            config.img_download_interval_sec
+        );
+        assert_eq!(
+            core.update_get_comic_interval_sec,
+            config.update_get_comic_interval_sec
+        );
+        assert_eq!(core.proxy_host, config.proxy_host);
+        assert_eq!(core.proxy_port, config.proxy_port);
+        assert_eq!(core.comic_dir_fmt, config.comic_dir_fmt);
+        assert_eq!(core.chapter_dir_fmt, config.chapter_dir_fmt);
+        assert_eq!(core.create_pdf_concurrency, config.create_pdf_concurrency);
+        assert_eq!(core.enable_merge_pdf, config.enable_merge_pdf);
+
+        assert_eq!(core.proxy_mode, source_api::ProxyMode::Custom);
+        assert_eq!(
+            core.export_skip_mode,
+            source_api::ExportSkipMode::SkipExisting
+        );
+
+        // These two fields have no counterpart on the shell `Config`; the From
+        // impl pins them to the historical default of 3 seconds.
+        assert_eq!(core.api_timeout_sec, 3);
+        assert_eq!(core.img_timeout_sec, 3);
+    }
+}
+
