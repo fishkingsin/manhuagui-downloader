@@ -14,8 +14,8 @@ use tracing::instrument;
 use crate::{
     downloader::{download_task::DownloadTask, download_task_state::DownloadTaskState},
     extensions::{AppHandleExt, EyreReportToMessage},
-    manhuagui_client::ManhuaguiClient,
 };
+use source_manhuagui::ManhuaguiClient;
 
 pub struct DownloadImgTask {
     app: AppHandle,
@@ -197,7 +197,7 @@ impl DownloadImgTask {
         tracing::trace!("图片下载任务已删除");
     }
 
-    fn manhuagui_client(&self) -> ManhuaguiClient {
+    fn manhuagui_client(&self) -> Arc<ManhuaguiClient> {
         self.app.get_manhuagui_client().inner().clone()
     }
 }

@@ -4099,13 +4099,19 @@ dependencies = [
 name = "source-manhuagui"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "eyre",
  "lz-str",
+ "parking_lot 0.12.3",
  "regex",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
  "scraper",
  "serde",
  "serde_json",
  "source-api",
+ "specta",
  "tracing",
 ]
 

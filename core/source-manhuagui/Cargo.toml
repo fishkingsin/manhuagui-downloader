@@ -12,3 +12,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 eyre = { workspace = true }
 tracing = { workspace = true }
+bytes = { workspace = true }
+parking_lot = { workspace = true }
+reqwest = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+specta = { workspace = true, optional = true, features = ["derive"] }
+
+[features]
+specta = ["dep:specta", "source-api/specta"]
+

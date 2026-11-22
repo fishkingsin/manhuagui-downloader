@@ -21,9 +21,10 @@ use crate::{
     downloader::{download_img_task::DownloadImgTask, download_task_state::DownloadTaskState},
     events::DownloadEvent,
     extensions::{AppHandleExt, EyreReportToMessage},
-    manhuagui_client::ManhuaguiClient,
     types::{ChapterInfo, Comic},
 };
+use source_api::PageRef;
+use source_manhuagui::ManhuaguiClient;
 
 pub struct DownloadTask {
     pub app: AppHandle,
@@ -151,9 +152,9 @@ impl DownloadTask {
         };
 
         let mut join_set = JoinSet::new();
-        for (i, url) in img_urls.into_iter().enumerate() {
+        for (i, page) in img_urls.into_iter().enumerate() {
             let download_img_task =
-                DownloadImgTask::new(self.clone(), url, i, temp_download_dir.clone());
+                DownloadImgTask::new(self.clone(), page.url, i, temp_download_dir.clone());
             join_set.spawn(download_img_task.process());
         }
         join_set.join_all().await;
@@ -201,7 +202,7 @@ impl DownloadTask {
     }
 
     #[instrument(level = "error", skip_all)]
-    async fn get_img_urls(&self) -> Option<Vec<String>> {
+    async fn get_img_urls(&self) -> Option<Vec<PageRef>> {
         tracing::trace!("章节开始获取图片链接");
 
         let img_urls = match self
@@ -417,7 +418,7 @@ impl DownloadTask {
         .emit(&self.app);
     }
 
-    fn manhuagui_client(&self) -> ManhuaguiClient {
+    fn manhuagui_client(&self) -> Arc<ManhuaguiClient> {
         self.app.get_manhuagui_client().inner().clone()
     }
 }

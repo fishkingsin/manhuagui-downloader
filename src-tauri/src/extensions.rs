@@ -1,14 +1,13 @@
+use std::sync::Arc;
+
 use eyre::eyre;
 use parking_lot::RwLock;
-use reqwest::Response;
-use reqwest_middleware::RequestBuilder;
 use scraper::error::SelectorErrorKind;
+use source_manhuagui::ManhuaguiClient;
 use tauri::{Manager, State};
-use tracing::instrument;
 
 use crate::{
     config::Config, downloader::download_manager::DownloadManager, export::ComicExportLock,
-    manhuagui_client::ManhuaguiClient,
 };
 
 pub trait EyreReportToMessage {
@@ -21,6 +20,7 @@ impl EyreReportToMessage for eyre::Report {
     }
 }
 
+#[allow(dead_code)]
 pub trait ToEyre<T> {
     fn to_eyre(self) -> eyre::Result<T>;
 }
@@ -31,33 +31,10 @@ impl<T> ToEyre<T> for Result<T, SelectorErrorKind<'_>> {
     }
 }
 
-pub trait SendWithTimeoutMsg {
-    /// 发送请求并处理超时错误
-    ///
-    /// - 如果遇到超时错误，返回带有用户友好信息的错误
-    /// - 否则返回原始错误
-    async fn send_with_timeout_msg(self) -> eyre::Result<Response>;
-}
-
-impl SendWithTimeoutMsg for RequestBuilder {
-    #[instrument(level = "error", skip_all)]
-    async fn send_with_timeout_msg(self) -> eyre::Result<Response> {
-        self.send().await.map_err(|e| {
-            if e.is_timeout() || e.is_middleware() {
-                eyre::Report::from(e).wrap_err(
-                    "网络连接超时，可能是未使用代理或IP被封，请使用代理或切换代理线路后重试",
-                )
-            } else {
-                eyre::Report::from(e)
-            }
-        })
-    }
-}
-
 pub trait AppHandleExt {
     fn get_config(&self) -> State<'_, RwLock<Config>>;
     fn get_core_config(&self) -> source_api::CoreConfig;
-    fn get_manhuagui_client(&self) -> State<'_, ManhuaguiClient>;
+    fn get_manhuagui_client(&self) -> State<'_, Arc<ManhuaguiClient>>;
     fn get_download_manager(&self) -> State<'_, DownloadManager>;
     fn get_export_lock(&self) -> State<'_, ComicExportLock>;
 }
@@ -70,8 +47,8 @@ impl AppHandleExt for tauri::AppHandle {
         let config = self.get_config().read().clone();
         (&config).into()
     }
-    fn get_manhuagui_client(&self) -> State<'_, ManhuaguiClient> {
-        self.state::<ManhuaguiClient>()
+    fn get_manhuagui_client(&self) -> State<'_, Arc<ManhuaguiClient>> {
+        self.state::<Arc<ManhuaguiClient>>()
     }
     fn get_download_manager(&self) -> State<'_, DownloadManager> {
         self.state::<DownloadManager>()

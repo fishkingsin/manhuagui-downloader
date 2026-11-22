@@ -77,8 +77,11 @@ pub fn save_config(app: AppHandle, config: Config) -> CommandResult<()> {
         tracing::debug!("保存配置成功");
     }
 
+    let core_config = app.get_core_config();
     if proxy_changed {
-        manhuagui_client.reload_client();
+        manhuagui_client.reload_client(&core_config);
+    } else {
+        manhuagui_client.update_config(&core_config);
     }
 
     if enable_file_logger_changed {

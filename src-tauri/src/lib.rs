@@ -6,14 +6,15 @@ mod events;
 mod export;
 mod extensions;
 mod logger;
-mod manhuagui_client;
 mod types;
 mod utils;
 
+use std::sync::Arc;
+
 use config::Config;
 use eyre::WrapErr;
-use manhuagui_client::ManhuaguiClient;
 use parking_lot::RwLock;
+use source_manhuagui::ManhuaguiClient;
 use tauri::{Manager, Wry};
 
 use crate::{
@@ -98,9 +99,10 @@ pub fn run() {
             ))?;
 
             let config = RwLock::new(Config::new(app.handle()).wrap_err("创建Config失败")?);
+            let core_config = (&*config.read()).into();
             app.manage(config);
 
-            let manhuagui_client = ManhuaguiClient::new(app.handle().clone());
+            let manhuagui_client = Arc::new(ManhuaguiClient::new(&core_config));
             app.manage(manhuagui_client);
 
             let download_manager = DownloadManager::new(app.handle());
