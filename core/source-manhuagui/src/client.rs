@@ -64,8 +64,7 @@ impl UserProfile {
     #[instrument(level = "error", skip_all)]
     pub fn from_html(html: &str) -> eyre::Result<UserProfile> {
         let document = Html::parse_document(html);
-        let avatar_box_sel =
-            Selector::parse(".avatar-box").map_err(|e| eyre!("{e:?}"))?;
+        let avatar_box_sel = Selector::parse(".avatar-box").map_err(|e| eyre!("{e:?}"))?;
         let avatar_box = document
             .select(&avatar_box_sel)
             .next()
@@ -115,8 +114,7 @@ impl GetFavoriteResult {
     ) -> eyre::Result<GetFavoriteResult> {
         let document = Html::parse_document(html);
         let mut comics = Vec::new();
-        let item_sel =
-            Selector::parse(".dy_content_li").map_err(|e| eyre!("{e:?}"))?;
+        let item_sel = Selector::parse(".dy_content_li").map_err(|e| eyre!("{e:?}"))?;
         for book_div in document.select(&item_sel) {
             let comic = ComicInFavorite::from_div(&book_div, id_to_dir_map)?;
             comics.push(comic);
@@ -133,8 +131,7 @@ impl GetFavoriteResult {
             None => 1,
         };
 
-        let total_sel =
-            Selector::parse(".flickr.right > span").map_err(|e| eyre!("{e:?}"))?;
+        let total_sel = Selector::parse(".flickr.right > span").map_err(|e| eyre!("{e:?}"))?;
         let total = match document.select(&total_sel).next() {
             Some(span) => span
                 .text()
@@ -192,8 +189,7 @@ impl ComicInFavorite {
         div: &ElementRef,
         id_to_dir_map: &HashMap<i64, PathBuf>,
     ) -> eyre::Result<ComicInFavorite> {
-        let title_sel =
-            Selector::parse(".dy_content_li h3 > a").map_err(|e| eyre!("{e:?}"))?;
+        let title_sel = Selector::parse(".dy_content_li h3 > a").map_err(|e| eyre!("{e:?}"))?;
         let a = div
             .select(&title_sel)
             .next()
@@ -225,8 +221,8 @@ impl ComicInFavorite {
             .ok_or_eyre("没有在封面的<img>中找到src属性")?;
         let cover = format!("https:{cover_src}");
 
-        let time_sel = Selector::parse(".dy_r > p > em:nth-child(2)")
-            .map_err(|e| eyre!("{e:?}"))?;
+        let time_sel =
+            Selector::parse(".dy_r > p > em:nth-child(2)").map_err(|e| eyre!("{e:?}"))?;
         let mut time_nodes = div.select(&time_sel);
         let last_update = time_nodes
             .next()
@@ -483,8 +479,8 @@ impl ManhuaguiClient {
         if status != StatusCode::OK {
             return Err(eyre!("预料之外的状态码({status}): {body}"));
         }
-        let mut get_favorite_result = GetFavoriteResult::from_html(&body)
-            .wrap_err("将body转换为GetFavoriteResult失败")?;
+        let mut get_favorite_result =
+            GetFavoriteResult::from_html(&body).wrap_err("将body转换为GetFavoriteResult失败")?;
         let id_to_dir_map = source_api::create_id_to_dir_map(&self.config.read().download_dir)?;
         get_favorite_result.update_fields(&id_to_dir_map);
         Ok(get_favorite_result)
@@ -512,8 +508,8 @@ fn create_api_client(config: &CoreConfig) -> ClientWithMiddleware {
 fn create_img_client(config: &CoreConfig) -> ClientWithMiddleware {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
 
-    let client_builder = reqwest::ClientBuilder::new()
-        .timeout(Duration::from_secs(config.img_timeout_sec));
+    let client_builder =
+        reqwest::ClientBuilder::new().timeout(Duration::from_secs(config.img_timeout_sec));
     let client = set_proxy(client_builder, config, "img_client")
         .build()
         .unwrap();

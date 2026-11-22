@@ -28,11 +28,7 @@ pub trait Source: Send + Sync {
 /// - Items with `updated_on: None` are treated as outside the window.
 /// - The cutoff date is inclusive (`updated_on == today - window_days` is inside the window).
 /// - `UpdateWindow::All` is never outside (`false`).
-pub fn page_outside_window(
-    items: &[ComicSummary],
-    window: UpdateWindow,
-    today: NaiveDate,
-) -> bool {
+pub fn page_outside_window(items: &[ComicSummary], window: UpdateWindow, today: NaiveDate) -> bool {
     let days = match window {
         UpdateWindow::Days7 => 7,
         UpdateWindow::Days15 => 15,

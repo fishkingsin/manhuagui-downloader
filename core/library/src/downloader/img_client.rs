@@ -57,8 +57,8 @@ pub async fn fetch_page_bytes(
 pub fn create_img_client(config: &CoreConfig) -> ClientWithMiddleware {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
 
-    let client_builder = reqwest::ClientBuilder::new()
-        .timeout(Duration::from_secs(config.img_timeout_sec));
+    let client_builder =
+        reqwest::ClientBuilder::new().timeout(Duration::from_secs(config.img_timeout_sec));
     let client = set_proxy(client_builder, config, "img_client")
         .build()
         .unwrap();

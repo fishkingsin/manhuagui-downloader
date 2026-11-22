@@ -24,7 +24,11 @@ fn test_page_outside_window_days7() {
 
     // today is inside
     let item_today = make_summary(1, Some(today));
-    assert!(!page_outside_window(&[item_today], UpdateWindow::Days7, today));
+    assert!(!page_outside_window(
+        &[item_today],
+        UpdateWindow::Days7,
+        today
+    ));
 
     // today - 6 days is inside
     let d6 = today - chrono::Duration::days(6);
@@ -43,7 +47,11 @@ fn test_page_outside_window_days7() {
 
     // None is treated as outside
     let item_none = make_summary(5, None);
-    assert!(page_outside_window(&[item_none], UpdateWindow::Days7, today));
+    assert!(page_outside_window(
+        &[item_none],
+        UpdateWindow::Days7,
+        today
+    ));
 
     // Mixed: one inside, one outside -> not all outside -> false
     let item_d5 = make_summary(6, Some(today - chrono::Duration::days(5)));
@@ -71,24 +79,44 @@ fn test_page_outside_window_days15_and_days30() {
     let d15 = today - chrono::Duration::days(15);
     let item_d15 = make_summary(1, Some(d15));
     // d15 is inside Days15 (inclusive cutoff)
-    assert!(!page_outside_window(&[item_d15.clone()], UpdateWindow::Days15, today));
+    assert!(!page_outside_window(
+        &[item_d15.clone()],
+        UpdateWindow::Days15,
+        today
+    ));
     // d15 is outside Days7
     assert!(page_outside_window(&[item_d15], UpdateWindow::Days7, today));
 
     let d16 = today - chrono::Duration::days(16);
     let item_d16 = make_summary(2, Some(d16));
-    assert!(page_outside_window(&[item_d16], UpdateWindow::Days15, today));
+    assert!(page_outside_window(
+        &[item_d16],
+        UpdateWindow::Days15,
+        today
+    ));
 
     let d30 = today - chrono::Duration::days(30);
     let item_d30 = make_summary(3, Some(d30));
     // d30 is inside Days30
-    assert!(!page_outside_window(&[item_d30.clone()], UpdateWindow::Days30, today));
+    assert!(!page_outside_window(
+        &[item_d30.clone()],
+        UpdateWindow::Days30,
+        today
+    ));
     // d30 is outside Days15
-    assert!(page_outside_window(&[item_d30], UpdateWindow::Days15, today));
+    assert!(page_outside_window(
+        &[item_d30],
+        UpdateWindow::Days15,
+        today
+    ));
 
     let d31 = today - chrono::Duration::days(31);
     let item_d31 = make_summary(4, Some(d31));
-    assert!(page_outside_window(&[item_d31], UpdateWindow::Days30, today));
+    assert!(page_outside_window(
+        &[item_d31],
+        UpdateWindow::Days30,
+        today
+    ));
 }
 
 #[test]
@@ -98,7 +126,11 @@ fn test_page_outside_window_all() {
     // Ancient item
     let ancient = today - chrono::Duration::days(3650);
     let item_ancient = make_summary(1, Some(ancient));
-    assert!(!page_outside_window(&[item_ancient], UpdateWindow::All, today));
+    assert!(!page_outside_window(
+        &[item_ancient],
+        UpdateWindow::All,
+        today
+    ));
 
     // Item with None
     let item_none = make_summary(2, None);

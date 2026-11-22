@@ -9,7 +9,11 @@ fn test_parse_list_page_japan() {
 
     assert_eq!(res.page, 1);
     assert_eq!(res.total_pages, 1263);
-    assert!(res.items.len() >= 20, "expected >= 20 items, got {}", res.items.len());
+    assert!(
+        res.items.len() >= 20,
+        "expected >= 20 items, got {}",
+        res.items.len()
+    );
 
     let first = &res.items[0];
     assert_eq!(first.comic_id.source_id, "manhuagui");
@@ -31,13 +35,18 @@ fn test_parse_list_page_japan_p2() {
 
     assert_eq!(res.page, 2);
     assert_eq!(res.total_pages, 1263);
-    assert!(res.items.len() >= 20, "expected >= 20 items, got {}", res.items.len());
+    assert!(
+        res.items.len() >= 20,
+        "expected >= 20 items, got {}",
+        res.items.len()
+    );
 }
 
 #[test]
 fn test_parse_list_page_missing_date() {
     let html = include_str!("fixtures/list_missing_date.html");
-    let res = parse_list_page(html).expect("parse_list_page with missing/invalid date should succeed");
+    let res =
+        parse_list_page(html).expect("parse_list_page with missing/invalid date should succeed");
 
     assert_eq!(res.items.len(), 3);
 
@@ -112,4 +121,3 @@ fn test_map_eyre_to_source_error() {
         other => panic!("expected ParseFailed, got {other:?}"),
     }
 }
-

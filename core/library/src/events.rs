@@ -135,10 +135,7 @@ mod tests {
             total: 3,
         })
         .unwrap();
-        assert_eq!(
-            start,
-            json!({ "uuid": "u", "comicTitle": "t", "total": 3 })
-        );
+        assert_eq!(start, json!({ "uuid": "u", "comicTitle": "t", "total": 3 }));
 
         let progress = serde_json::to_value(ExportProgressPayload {
             uuid: "u".to_string(),

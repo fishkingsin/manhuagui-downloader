@@ -172,4 +172,3 @@ mod tests {
             .expect("Failed to export typescript bindings");
     }
 }
-

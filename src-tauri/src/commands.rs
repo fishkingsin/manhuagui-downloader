@@ -578,7 +578,11 @@ pub fn show_path_in_file_manager(app: AppHandle, path: &str) -> CommandResult<()
         chapter_id = chapter_id
     )
 )]
-pub async fn create_download_task(app: AppHandle, comic: Comic, chapter_id: i64) -> CommandResult<()> {
+pub async fn create_download_task(
+    app: AppHandle,
+    comic: Comic,
+    chapter_id: i64,
+) -> CommandResult<()> {
     let chapter_info = comic
         .groups
         .values()

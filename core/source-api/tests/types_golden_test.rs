@@ -1,15 +1,16 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
 use source_api::{
     BrowseResult, ChapterDirFmtParams, ChapterInfo, ChapterPages, Comic, ComicDirFmtParams,
     ComicId, ComicInSearch, ComicSummary, DownloadTaskState, PageRef, SearchResult,
     SearchResultComic, UpdateWindow,
 };
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[test]
 fn test_comic_golden_roundtrip() {
     let comic_json = include_str!("fixtures/pre_move_comic.json");
-    let comic: Comic = serde_json::from_str(comic_json).expect("failed to deserialize pre_move_comic.json");
+    let comic: Comic =
+        serde_json::from_str(comic_json).expect("failed to deserialize pre_move_comic.json");
 
     assert_eq!(comic.id, 67890);
     assert_eq!(comic.title, "测试漫画");
@@ -17,32 +18,44 @@ fn test_comic_golden_roundtrip() {
     assert_eq!(comic.year, 2024);
     assert_eq!(comic.status, "连载中");
     assert_eq!(comic.is_downloaded, Some(true));
-    assert_eq!(comic.comic_download_dir, Some(PathBuf::from("/path/to/comic")));
+    assert_eq!(
+        comic.comic_download_dir,
+        Some(PathBuf::from("/path/to/comic"))
+    );
 
     let reserialized = serde_json::to_string_pretty(&comic).expect("failed to serialize Comic");
     let v1: serde_json::Value = serde_json::from_str(comic_json).unwrap();
     let v2: serde_json::Value = serde_json::from_str(&reserialized).unwrap();
-    assert_eq!(v1, v2, "Comic serialization must match pre-move golden fixture exactly");
+    assert_eq!(
+        v1, v2,
+        "Comic serialization must match pre-move golden fixture exactly"
+    );
 }
 
 #[test]
 fn test_comic_metadata_golden_roundtrip() {
     let comic_json = include_str!("fixtures/pre_move_comic_metadata.json");
-    let comic: Comic = serde_json::from_str(comic_json).expect("failed to deserialize pre_move_comic_metadata.json");
+    let comic: Comic = serde_json::from_str(comic_json)
+        .expect("failed to deserialize pre_move_comic_metadata.json");
 
     assert_eq!(comic.id, 67890);
     assert_eq!(comic.is_downloaded, None);
 
-    let reserialized = serde_json::to_string_pretty(&comic).expect("failed to serialize Comic metadata");
+    let reserialized =
+        serde_json::to_string_pretty(&comic).expect("failed to serialize Comic metadata");
     let v1: serde_json::Value = serde_json::from_str(comic_json).unwrap();
     let v2: serde_json::Value = serde_json::from_str(&reserialized).unwrap();
-    assert_eq!(v1, v2, "Comic metadata serialization must match pre-move golden fixture exactly");
+    assert_eq!(
+        v1, v2,
+        "Comic metadata serialization must match pre-move golden fixture exactly"
+    );
 }
 
 #[test]
 fn test_chapter_info_golden_roundtrip() {
     let chapter_json = include_str!("fixtures/pre_move_chapter_info.json");
-    let chapter: ChapterInfo = serde_json::from_str(chapter_json).expect("failed to deserialize pre_move_chapter_info.json");
+    let chapter: ChapterInfo = serde_json::from_str(chapter_json)
+        .expect("failed to deserialize pre_move_chapter_info.json");
 
     assert_eq!(chapter.chapter_id, 12345);
     assert_eq!(chapter.chapter_title, "第01话");
@@ -51,27 +64,39 @@ fn test_chapter_info_golden_roundtrip() {
     assert_eq!(chapter.is_downloaded, Some(true));
     assert!(chapter.is_cbz_exported);
     assert!(!chapter.is_pdf_exported);
-    assert_eq!(chapter.chapter_download_dir, Some(PathBuf::from("/path/to/chapter")));
+    assert_eq!(
+        chapter.chapter_download_dir,
+        Some(PathBuf::from("/path/to/chapter"))
+    );
 
-    let reserialized = serde_json::to_string_pretty(&chapter).expect("failed to serialize ChapterInfo");
+    let reserialized =
+        serde_json::to_string_pretty(&chapter).expect("failed to serialize ChapterInfo");
     let v1: serde_json::Value = serde_json::from_str(chapter_json).unwrap();
     let v2: serde_json::Value = serde_json::from_str(&reserialized).unwrap();
-    assert_eq!(v1, v2, "ChapterInfo serialization must match pre-move golden fixture exactly");
+    assert_eq!(
+        v1, v2,
+        "ChapterInfo serialization must match pre-move golden fixture exactly"
+    );
 }
 
 #[test]
 fn test_chapter_metadata_golden_roundtrip() {
     let chapter_json = include_str!("fixtures/pre_move_chapter_metadata.json");
-    let chapter: ChapterInfo = serde_json::from_str(chapter_json).expect("failed to deserialize pre_move_chapter_metadata.json");
+    let chapter: ChapterInfo = serde_json::from_str(chapter_json)
+        .expect("failed to deserialize pre_move_chapter_metadata.json");
 
     assert_eq!(chapter.chapter_id, 12345);
     assert_eq!(chapter.is_downloaded, None);
     assert_eq!(chapter.chapter_download_dir, None);
 
-    let reserialized = serde_json::to_string_pretty(&chapter).expect("failed to serialize ChapterInfo metadata");
+    let reserialized =
+        serde_json::to_string_pretty(&chapter).expect("failed to serialize ChapterInfo metadata");
     let v1: serde_json::Value = serde_json::from_str(chapter_json).unwrap();
     let v2: serde_json::Value = serde_json::from_str(&reserialized).unwrap();
-    assert_eq!(v1, v2, "ChapterInfo metadata serialization must match pre-move golden fixture exactly");
+    assert_eq!(
+        v1, v2,
+        "ChapterInfo metadata serialization must match pre-move golden fixture exactly"
+    );
 }
 
 #[test]
@@ -193,7 +218,10 @@ fn test_new_domain_types() {
     assert_eq!(des_browse, browse);
 
     let mut headers = HashMap::new();
-    headers.insert("Referer".to_string(), "https://www.manhuagui.com/".to_string());
+    headers.insert(
+        "Referer".to_string(),
+        "https://www.manhuagui.com/".to_string(),
+    );
     let page_ref = PageRef {
         url: "https://img.manhuagui.com/001.jpg".to_string(),
         headers,
@@ -219,4 +247,3 @@ fn test_filename_filter_character_substitutions() {
         "hello world test：star⭐q？quote'lt《gt》pipe丨dot.txt"
     );
 }
-

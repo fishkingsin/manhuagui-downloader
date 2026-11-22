@@ -612,7 +612,8 @@ impl Comic {
             region: self.region.clone(),
             author: author.clone(),
         };
-        let comic_download_dir = Comic::get_comic_download_dir_by_fmt(config, &comic_dir_fmt_params)?;
+        let comic_download_dir =
+            Comic::get_comic_download_dir_by_fmt(config, &comic_dir_fmt_params)?;
         self.comic_download_dir = Some(comic_download_dir.clone());
 
         for chapter_info in &mut self.groups.values_mut().flatten() {

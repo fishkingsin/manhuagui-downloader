@@ -162,7 +162,10 @@ impl EventObserver for CoreObserver {
         match event.name {
             EVENT_SPEED => {
                 if let Ok(payload) = serde_json::from_value::<SpeedPayload>(event.payload.clone()) {
-                    let _ = DownloadEvent::Speed { speed: payload.speed }.emit(app);
+                    let _ = DownloadEvent::Speed {
+                        speed: payload.speed,
+                    }
+                    .emit(app);
                 }
             }
             EVENT_SLEEPING => {

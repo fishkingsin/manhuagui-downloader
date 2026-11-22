@@ -17,8 +17,8 @@ use super::{
     ExportFormat,
 };
 use crate::events::{
-    ExportEndPayload, ExportErrorPayload, ExportProgressPayload, ExportStartPayload,
-    EVENT_CBZ_END, EVENT_CBZ_ERROR, EVENT_CBZ_PROGRESS, EVENT_CBZ_START,
+    ExportEndPayload, ExportErrorPayload, ExportProgressPayload, ExportStartPayload, EVENT_CBZ_END,
+    EVENT_CBZ_ERROR, EVENT_CBZ_PROGRESS, EVENT_CBZ_START,
 };
 
 struct CbzErrorEventGuard<'a> {
@@ -71,7 +71,13 @@ pub fn cbz_chapters(
     let downloaded_chapters = get_downloaded_chapters_by_ids(&comic.groups, &chapter_ids);
 
     // 调用内部实现(用户主动选择，所以不跳过)
-    cbz_internal(config, observer, comic, downloaded_chapters, ExportSkipMode::None)
+    cbz_internal(
+        config,
+        observer,
+        comic,
+        downloaded_chapters,
+        ExportSkipMode::None,
+    )
 }
 
 #[allow(clippy::cast_possible_wrap)]

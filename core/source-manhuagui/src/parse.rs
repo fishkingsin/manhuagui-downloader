@@ -30,8 +30,8 @@ pub fn parse_comic(html: &str) -> eyre::Result<Comic> {
                 .attr("value")
                 .ok_or_eyre("没有在包含隐藏数据的<input>中找到value属性")?;
 
-            let decompressed_data = lz_str::decompress_from_base64(compressed_data)
-                .ok_or_eyre("lzstring解压缩失败")?;
+            let decompressed_data =
+                lz_str::decompress_from_base64(compressed_data).ok_or_eyre("lzstring解压缩失败")?;
 
             let hidden_html = String::from_utf16(&decompressed_data)
                 .wrap_err("lzstring解压缩后的数据不是utf-16字符串")?;

@@ -13,11 +13,8 @@ use tracing::instrument;
 use source_api::PageRef;
 
 use crate::downloader::{
-    download_task::DownloadTask,
-    download_task_state::DownloadTaskState,
-    img_client::fetch_page_bytes,
-    DownloadDeps,
-    EyreReportToMessage,
+    download_task::DownloadTask, download_task_state::DownloadTaskState,
+    img_client::fetch_page_bytes, DownloadDeps, EyreReportToMessage,
 };
 
 pub struct DownloadImgTask {

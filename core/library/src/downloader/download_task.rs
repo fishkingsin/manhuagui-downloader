@@ -401,9 +401,7 @@ impl DownloadTask {
 
     fn emit_event(&self, name: &'static str, payload: &impl serde::Serialize) {
         if let Ok(payload) = serde_json::to_value(payload) {
-            self.deps
-                .observer
-                .on_event(&LibraryEvent { name, payload });
+            self.deps.observer.on_event(&LibraryEvent { name, payload });
         }
     }
 }

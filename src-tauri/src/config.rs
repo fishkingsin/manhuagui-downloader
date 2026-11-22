@@ -240,4 +240,3 @@ mod tests {
         assert_eq!(core.img_timeout_sec, 3);
     }
 }
-

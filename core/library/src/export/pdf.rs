@@ -24,8 +24,9 @@ use super::{
 };
 use crate::events::{
     ExportEndPayload, ExportErrorPayload, ExportProgressPayload, ExportStartPayload,
-    EVENT_PDF_CREATE_END, EVENT_PDF_CREATE_ERROR, EVENT_PDF_CREATE_PROGRESS, EVENT_PDF_CREATE_START,
-    EVENT_PDF_MERGE_END, EVENT_PDF_MERGE_ERROR, EVENT_PDF_MERGE_PROGRESS, EVENT_PDF_MERGE_START,
+    EVENT_PDF_CREATE_END, EVENT_PDF_CREATE_ERROR, EVENT_PDF_CREATE_PROGRESS,
+    EVENT_PDF_CREATE_START, EVENT_PDF_MERGE_END, EVENT_PDF_MERGE_ERROR, EVENT_PDF_MERGE_PROGRESS,
+    EVENT_PDF_MERGE_START,
 };
 
 struct PdfCreateErrorEventGuard<'a> {
@@ -41,7 +42,11 @@ impl Drop for PdfCreateErrorEventGuard<'_> {
         }
 
         let uuid = self.uuid.clone();
-        emit_event(self.observer, EVENT_PDF_CREATE_ERROR, ExportErrorPayload { uuid });
+        emit_event(
+            self.observer,
+            EVENT_PDF_CREATE_ERROR,
+            ExportErrorPayload { uuid },
+        );
     }
 }
 
@@ -58,7 +63,11 @@ impl Drop for PdfMergeErrorEventGuard<'_> {
         }
 
         let uuid = self.uuid.clone();
-        emit_event(self.observer, EVENT_PDF_MERGE_ERROR, ExportErrorPayload { uuid });
+        emit_event(
+            self.observer,
+            EVENT_PDF_MERGE_ERROR,
+            ExportErrorPayload { uuid },
+        );
     }
 }
 
@@ -79,7 +88,14 @@ pub fn pdf(config: &CoreConfig, observer: &dyn EventObserver, comic: &Comic) -> 
     let downloaded_chapters = get_downloaded_chapters(&comic.groups);
 
     // 调用内部实现
-    pdf_internal(config, observer, comic, downloaded_chapters, skip_mode, enable_merge)
+    pdf_internal(
+        config,
+        observer,
+        comic,
+        downloaded_chapters,
+        skip_mode,
+        enable_merge,
+    )
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -99,7 +115,14 @@ pub fn pdf_chapters(
     let downloaded_chapters = get_downloaded_chapters_by_ids(&comic.groups, &chapter_ids);
 
     // 调用内部实现(用户主动选择，不跳过，不合并)
-    pdf_internal(config, observer, comic, downloaded_chapters, ExportSkipMode::None, false)
+    pdf_internal(
+        config,
+        observer,
+        comic,
+        downloaded_chapters,
+        ExportSkipMode::None,
+        false,
+    )
 }
 
 #[allow(clippy::cast_possible_truncation)]

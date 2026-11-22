@@ -4,11 +4,7 @@ pub mod download_task;
 pub mod download_task_state;
 mod img_client;
 
-use std::sync::{
-    atomic::AtomicU64,
-    Arc,
-    OnceLock,
-};
+use std::sync::{atomic::AtomicU64, Arc, OnceLock};
 
 use parking_lot::RwLock;
 use reqwest_middleware::ClientWithMiddleware;

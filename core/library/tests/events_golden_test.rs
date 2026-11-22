@@ -23,8 +23,7 @@ use source_api::{ChapterInfo, Comic, DownloadTaskState, LibraryEvent};
 // ---- golden fixtures captured from the current serde shapes ----
 
 const SPEED_GOLDEN: &str = r#"{"event":"Speed","data":{"speed":"1.2 MB/s"}}"#;
-const SLEEPING_GOLDEN: &str =
-    r#"{"event":"Sleeping","data":{"chapterId":123,"remainingSec":5}}"#;
+const SLEEPING_GOLDEN: &str = r#"{"event":"Sleeping","data":{"chapterId":123,"remainingSec":5}}"#;
 const TASK_DELETE_GOLDEN: &str = r#"{"event":"TaskDelete","data":{"chapterId":123}}"#;
 const TASK_UPDATE_GOLDEN: &str = r#"{"event":"TaskUpdate","data":{"state":"Downloading","chapterId":123,"downloadedImgCount":5,"totalImgCount":10}}"#;
 const TASK_CREATE_GOLDEN: &str = r#"{"event":"TaskCreate","data":{"state":"Downloading","comic":{"id":1,"title":"测试漫画","subtitle":null,"cover":"https://example.com/cover.jpg","status":"连载中","updateTime":"2026-11-22","year":2024,"region":"日本","genres":["冒险"],"authors":["测试作者"],"aliases":[],"intro":"简介","groups":{"单话":[{"chapterId":123,"chapterTitle":"第01话","chapterSize":10,"comicId":1,"comicTitle":"测试漫画","groupName":"单话","groupSize":1,"order":1.0,"comicStatus":"连载中","isPdfExported":false,"isCbzExported":false}]}},"chapterInfo":{"chapterId":123,"chapterTitle":"第01话","chapterSize":10,"comicId":1,"comicTitle":"测试漫画","groupName":"单话","groupSize":1,"order":1.0,"comicStatus":"连载中","isPdfExported":false,"isCbzExported":false},"downloadedImgCount":0,"totalImgCount":10}}"#;

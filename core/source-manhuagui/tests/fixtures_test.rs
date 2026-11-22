@@ -43,11 +43,7 @@ fn test_parse_search() {
     assert_eq!(search.comics[0].authors, vec!["尾田荣一郎"]);
     assert_eq!(
         search.comics[0].genres,
-        vec![
-            "热血".to_string(),
-            "冒险".to_string(),
-            "格斗".to_string()
-        ]
+        vec!["热血".to_string(), "冒险".to_string(), "格斗".to_string()]
     );
 }
 
@@ -55,7 +51,11 @@ fn test_parse_search() {
 fn test_parse_list_page() {
     let html = include_str!("fixtures/list_japan.html");
     let res = source_manhuagui::parse_list_page(html).expect("parse_list_page should succeed");
-    assert!(res.items.len() >= 20, "expected >= 20 items, got {}", res.items.len());
+    assert!(
+        res.items.len() >= 20,
+        "expected >= 20 items, got {}",
+        res.items.len()
+    );
 
     let first = &res.items[0];
     assert_eq!(first.comic_id.native_id, 24558);
@@ -87,4 +87,3 @@ fn test_parse_list_page_missing_date() {
     assert_eq!(res.items[2].updated_on, None);
     assert_eq!(res.items[2].rating, Some(6.0));
 }
-

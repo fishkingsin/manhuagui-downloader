@@ -17,10 +17,8 @@ use source_api::{Comic, CoreConfig, EventObserver, LibraryEvent, PageRef};
 
 use crate::{
     downloader::{
-        download_task::DownloadTask,
-        download_task_state::DownloadTaskState,
-        img_client::create_img_client,
-        DownloadDeps,
+        download_task::DownloadTask, download_task_state::DownloadTaskState,
+        img_client::create_img_client, DownloadDeps,
     },
     events::{SpeedPayload, EVENT_SPEED},
 };
@@ -151,7 +149,10 @@ impl DownloadManager {
         Ok(())
     }
 
-    async fn emit_download_speed_loop(observer: Arc<dyn EventObserver>, byte_per_sec: Arc<AtomicU64>) {
+    async fn emit_download_speed_loop(
+        observer: Arc<dyn EventObserver>,
+        byte_per_sec: Arc<AtomicU64>,
+    ) {
         let mut interval = tokio::time::interval(Duration::from_secs(1));
 
         loop {
